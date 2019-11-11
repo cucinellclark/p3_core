@@ -7,6 +7,7 @@ package P3DataAPI;
 use File::Temp;
 use LWP::UserAgent;
 use strict;
+use POSIX;
 use JSON::XS;
 use gjoseqlib;
 use URI::Escape;
@@ -44,6 +45,18 @@ IO::Socket::SSL::set_ctx_defaults(
                                   );
 
 no warnings 'once';
+
+#
+# Logging support, enabled with P3_DATA_API_LOGFILE
+#
+
+our $g_log_fh;
+
+if (my $f = $ENV{P3_DATA_API_LOGFILE})
+{
+    open($g_log_fh, ">>", $f) or warn "Error opening logfile $f: $!";
+}
+
 
 eval { require FIG_Config; };
 
@@ -327,11 +340,19 @@ sub submit_query {
     my $tries = 0;
     while (! $resp) {
 #        print STDERR "content = $q\n";
+	my $t1 = gettimeofday;
         my $response = $ua->post($url,
                              Accept => "application/json",
                              $self->auth_header,
                              Content => $q,
                         );
+	my $t2 = gettimeofday;
+	if ($g_log_fh)
+	{
+	    my $elap = $t2 - $t1;
+	    my $ms = int(1000 * ($t1 - int($t1)));
+	    print $g_log_fh strftime("%Y-%m-%d %H:%M:%S", localtime $t1) . sprintf(".%03d %.3f", $ms, $elap) . " $core " . $response->code . " "  . $response->header("Content-Length") . "\n";
+	}
 #        print STDERR Dumper($response);
         my $error;
         if ( $response->is_success ) {
