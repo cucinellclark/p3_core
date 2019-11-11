@@ -55,6 +55,7 @@ our $g_log_fh;
 if (my $f = $ENV{P3_DATA_API_LOGFILE})
 {
     open($g_log_fh, ">>", $f) or warn "Error opening logfile $f: $!";
+    $g_log_fh->autoflush(1);
 }
 
 
@@ -351,7 +352,7 @@ sub submit_query {
 	{
 	    my $elap = $t2 - $t1;
 	    my $ms = int(1000 * ($t1 - int($t1)));
-	    print $g_log_fh strftime("%Y-%m-%d %H:%M:%S", localtime $t1) . sprintf(".%03d %.3f", $ms, $elap) . " $core " . $response->code . " "  . $response->header("Content-Length") . "\n";
+	    print $g_log_fh strftime("%Y-%m-%d %H:%M:%S", localtime $t1) . sprintf(".%03d %.3f", $ms, $elap) . " $$ $core " . $response->code . " "  . $response->header("Content-Length") . "\n";
 	}
 #        print STDERR Dumper($response);
         my $error;
