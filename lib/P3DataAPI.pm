@@ -352,7 +352,7 @@ sub submit_query {
 	{
 	    my $elap = $t2 - $t1;
 	    my $ms = int(1000 * ($t1 - int($t1)));
-	    print $g_log_fh strftime("%Y-%m-%d %H:%M:%S", localtime $t1) . sprintf(".%03d %.3f", $ms, $elap) . " $$ $core " . $response->code . " "  . $response->header("Content-Length") . "\n";
+	    print $g_log_fh strftime("%Y-%m-%d %H:%M:%S", localtime $t1) . sprintf(".%03d %.3f", $ms, $elap) . " " . $response->code . " $$ $core " . $response->header("Content-Length") . "\n";
 	}
 #        print STDERR Dumper($response);
         my $error;
@@ -373,6 +373,10 @@ sub submit_query {
             if ($tries >= 5) {
                 die $error;
             } else {
+		if ($g_log_fh)
+		{
+		    print $g_log_fh "ERROR: " . substr($error, 0, 200) . "\n";
+		}
                 my $qabbrv = substr($q, 0, 500) . (length($q) > 500 ? '...' : "");
                 $self->_log("Retrying $qabbrv\n");
                 $tries++;

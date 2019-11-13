@@ -1101,17 +1101,24 @@ sub write_seed_dir
     # Taxonomy is supposed to be a string ... (!)
     if (ref($self->{taxonomy}))
     {
-    my @t = @{$self->{taxonomy}};
-    shift @t if $t[0] =~ /^cellular/;
-
-    print Dumper(\@t);
-    $write_md->("TAXONOMY", join("; ", @t));
+	my @t = @{$self->{taxonomy}};
+	shift @t if $t[0] =~ /^cellular/;
+	
+	print Dumper(\@t);
+	$write_md->("TAXONOMY", join("; ", @t));
     }
-    else
+    elsif (my $t = $self->{taxonomy})
     {
-    my $t = $self->{taxonomy};
-    $t =~ s/^cellular[^;]+;\s+//;
-    $write_md->("TAXONOMY", $t);
+	my $t = $self->{taxonomy};
+	$t =~ s/^cellular[^;]+;\s+//;
+	$write_md->("TAXONOMY", $t);
+    }
+    elsif (ref(my $lin = $self->{ncbi_lineage}))
+    {
+	my @t = map { $_->[0] } @$lin;
+	print Dumper(\@t);
+	shift @t if $t[0] =~ /^cellular/;
+	$write_md->("TAXONOMY", join("; ", @t));
     }
     $write_md->("TAXONOMY_ID", $self->{ncbi_taxonomy_id}) if $self->{ncbi_taxonomy_id};
 
