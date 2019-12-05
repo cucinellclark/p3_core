@@ -7,7 +7,7 @@ package P3DataAPI;
 use File::Temp;
 use LWP::UserAgent;
 use strict;
-use POSIX;
+use POSIX qw(strftime);
 use JSON::XS;
 use gjoseqlib;
 use URI::Escape;
@@ -341,19 +341,19 @@ sub submit_query {
     my $tries = 0;
     while (! $resp) {
 #        print STDERR "content = $q\n";
-	my $t1 = gettimeofday;
+    my $t1 = gettimeofday;
         my $response = $ua->post($url,
                              Accept => "application/json",
                              $self->auth_header,
                              Content => $q,
                         );
-	my $t2 = gettimeofday;
-	if ($g_log_fh)
-	{
-	    my $elap = $t2 - $t1;
-	    my $ms = int(1000 * ($t1 - int($t1)));
-	    print $g_log_fh strftime("%Y-%m-%d %H:%M:%S", localtime $t1) . sprintf(".%03d %.3f", $ms, $elap) . " " . $response->code . " $$ $core " . $response->header("Content-Length") . "\n";
-	}
+    my $t2 = gettimeofday;
+    if ($g_log_fh)
+    {
+        my $elap = $t2 - $t1;
+        my $ms = int(1000 * ($t1 - int($t1)));
+        print $g_log_fh strftime("%Y-%m-%d %H:%M:%S", localtime $t1) . sprintf(".%03d %.3f", $ms, $elap) . " " . $response->code . " $$ $core " . $response->header("Content-Length") . "\n";
+    }
 #        print STDERR Dumper($response);
         my $error;
         if ( $response->is_success ) {
@@ -373,10 +373,10 @@ sub submit_query {
             if ($tries >= 5) {
                 die $error;
             } else {
-		if ($g_log_fh)
-		{
-		    print $g_log_fh "ERROR: " . substr($error, 0, 200) . "\n";
-		}
+        if ($g_log_fh)
+        {
+            print $g_log_fh "ERROR: " . substr($error, 0, 200) . "\n";
+        }
                 my $qabbrv = substr($q, 0, 500) . (length($q) > 500 ? '...' : "");
                 $self->_log("Retrying $qabbrv\n");
                 $tries++;
@@ -2955,7 +2955,7 @@ sub gto_of {
             "select",      "genome_id",
             "genome_name", "genome_status",
             "taxon_id",    "taxon_lineage_names",
-            "taxon_lineage_ids"
+            "taxon_lineage_ids", "gc_content"
         ],
     );
 
@@ -2992,7 +2992,8 @@ sub gto_of {
                           ncbi_taxonomy_id => $g->{taxon_id},
                           taxonomy         => $g->{taxon_lineage_names},
                           domain           => $domain,
-                          genetic_code     => $genetic_code
+                          genetic_code     => $genetic_code,
+                          gc_content	   => $g->{gc_content},
                           }
                          );
 
@@ -3038,7 +3039,8 @@ sub gto_of {
                           "alt_locus_tag", "refseq_locus_tag",
                           "protein_id",    "gene_id",
                           "gi",            "gene",
-                          "uniprotkb_accession", "genome_id"
+                          "uniprotkb_accession", "genome_id",
+                          "pgfam_id", "plfam_id",
                           ]
                         );
 
@@ -3076,7 +3078,10 @@ sub gto_of {
             }
             my @familyList;
             if ($f->{pgfam_id}) {
-                @familyList = (['PGF', $f->{pgfam_id}]);
+                push @familyList, ['PGFAM', $f->{pgfam_id}];
+            }
+            if ($f->{plfam_id}) {
+                push @familyList, ['PLFAM', $f->{plfam_id}];
             }
             $retVal->add_feature(
                              {

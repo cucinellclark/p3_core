@@ -55,7 +55,6 @@ the C<prepare_for_return()> method which strips these indexes out of the data ob
 
 use strict;
 use warnings;
-use SeedUtils;
 use File::Temp;
 use File::Slurp;
 use JSON::XS;
@@ -937,7 +936,7 @@ Write the protein translations to a FASTA file.
 
 sub write_protein_translations_to_file
 {
-    my($self, $filename) = @_;
+    my($self, $filename, $include_function) = @_;
 
     my $fh;
     open($fh, ">", $filename) or die "Cannot write $filename: $!";
@@ -947,7 +946,11 @@ sub write_protein_translations_to_file
         my $trans = $feature->{protein_translation};
         if ($trans)
         {
-            write_fasta($fh, [$feature->{id}, undef, $trans]);
+            my $product = '';
+            if ($feature->{function} && $include_function) {
+                $product = $feature->{function};
+            }
+            write_fasta($fh, [$feature->{id}, $product, $trans]);
         }
     }
     close($fh);
@@ -1101,24 +1104,24 @@ sub write_seed_dir
     # Taxonomy is supposed to be a string ... (!)
     if (ref($self->{taxonomy}))
     {
-	my @t = @{$self->{taxonomy}};
-	shift @t if $t[0] =~ /^cellular/;
-	
-	print Dumper(\@t);
-	$write_md->("TAXONOMY", join("; ", @t));
+    my @t = @{$self->{taxonomy}};
+    shift @t if $t[0] =~ /^cellular/;
+
+    print Dumper(\@t);
+    $write_md->("TAXONOMY", join("; ", @t));
     }
     elsif (my $t = $self->{taxonomy})
     {
-	my $t = $self->{taxonomy};
-	$t =~ s/^cellular[^;]+;\s+//;
-	$write_md->("TAXONOMY", $t);
+	    my $t = $self->{taxonomy};
+	    $t =~ s/^cellular[^;]+;\s+//;
+	    $write_md->("TAXONOMY", $t);
     }
     elsif (ref(my $lin = $self->{ncbi_lineage}))
     {
-	my @t = map { $_->[0] } @$lin;
-	print Dumper(\@t);
-	shift @t if $t[0] =~ /^cellular/;
-	$write_md->("TAXONOMY", join("; ", @t));
+	    my @t = map { $_->[0] } @$lin;
+	    print Dumper(\@t);
+	    shift @t if $t[0] =~ /^cellular/;
+	    $write_md->("TAXONOMY", join("; ", @t));
     }
     $write_md->("TAXONOMY_ID", $self->{ncbi_taxonomy_id}) if $self->{ncbi_taxonomy_id};
 
