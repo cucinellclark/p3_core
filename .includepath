@@ -4,4 +4,5 @@
     <includepathentry path="/Users/parrello/Documents/SEEDtk/git/SEEDtk/config" />
     <includepathentry path="/Users/parrello/Documents/SEEDtk/git/p3_code/lib" />
     <includepathentry path="/Users/parrello/Documents/SEEDtk/git/p3_core/lib" />
+    <includepathentry path="/Users/parrello/Documents/SEEDtk/git/p3_seed_server/lib" />
 </includepath>
