@@ -1172,14 +1172,76 @@ input is used.
 
 =back
 
-This method returns the specifications for these command-line options in a form
-that can be used in the L<ScriptUtils/Opts> method.
-
 =cut
 
 sub ih_options {
     return (
             ["input|i=s", "name of the input file (if not the standard input)"]
+    );
+}
+
+=head3 oh
+
+    my $oh = P3Utils::oh($opt);
+
+Get the output file handle from the options. If no output file is specified in the options,
+opens the standard output.
+
+=over 4
+
+=item opt
+
+L<Getopt::Long::Descriptive::Opts> object for the current command-line options.
+
+=item RETURN
+
+Returns an open file handle for the script output.
+
+=back
+
+=cut
+
+sub oh {
+    # Get the parameters.
+    my ($opt) = @_;
+    # Declare the return variable.
+    my $retVal;
+    # Get the input file name.
+    my $fileName = $opt->output;
+    # Check for a value.
+    if (! $fileName) {
+        # Here we have the standard output.
+        $retVal = \*STDOUT;
+    } else {
+        # Here we have a real file name.
+        open($retVal, ">$fileName") ||
+            die "Could not open output file $fileName: $!";
+    }
+    # Return the open handle.
+    return $retVal;
+}
+
+
+=head3 oh_options
+
+    my @opt_specs = P3Utils::oh_options();
+
+These are the command-line options for specifying a standard output file.
+
+=over 4
+
+=item output
+
+Name of the main output file. If omitted and an input file is required, the standard
+output is used.
+
+=back
+
+=cut
+
+sub oh_options {
+    return (
+            ["output|o=s", "name of the output file (if not the standard output)"]
     );
 }
 
@@ -1260,6 +1322,49 @@ sub match {
     }
     # Return the determination indicator.
     return $retVal;
+}
+
+=head3 protein_fasta
+
+    P3Utils::protein_fasta($p3, $genome, $fileName);
+
+Create a FASTA file for the proteins in a genome.
+
+=over 4
+
+=item p3
+
+A L<P3DataAPI> object for downloading from PATRIC.
+
+=item genome
+
+The ID of the genome whose proteins are desired.
+
+=item fileName
+
+The name of a file to contain the FASTA data, or an open output file handle to which the data should be written.
+
+=back
+
+=cut
+
+sub protein_fasta {
+    my ($p3, $genome, $fileName) = @_;
+    # Get the output handle.
+    my $oh;
+    if (ref $fileName eq 'GLOB') {
+        $oh = $fileName;
+    } else {
+        open($oh, '>', $fileName) || die "Could not open $fileName: $!";
+    }
+    my $triples = P3Utils::get_data($p3, 'feature', [['eq', 'genome_id', $genome], ['eq', 'feature_type', 'CDS']],
+            ['patric_id', 'product', 'aa_sequence']);
+    for my $triple (@$triples) {
+        my ($id, $comment, $seq) = @$triple;
+        if ($id =~ /^fig/ && $comment && $seq) {
+            print $oh ">$id $comment\n$seq\n";
+        }
+    }
 }
 
 =head3 find_headers
