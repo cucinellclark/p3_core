@@ -1112,16 +1112,16 @@ sub write_seed_dir
     }
     elsif (my $t = $self->{taxonomy})
     {
-	    my $t = $self->{taxonomy};
-	    $t =~ s/^cellular[^;]+;\s+//;
-	    $write_md->("TAXONOMY", $t);
+        my $t = $self->{taxonomy};
+        $t =~ s/^cellular[^;]+;\s+//;
+        $write_md->("TAXONOMY", $t);
     }
     elsif (ref(my $lin = $self->{ncbi_lineage}))
     {
-	    my @t = map { $_->[0] } @$lin;
-	    print Dumper(\@t);
-	    shift @t if $t[0] =~ /^cellular/;
-	    $write_md->("TAXONOMY", join("; ", @t));
+        my @t = map { $_->[0] } @$lin;
+        print Dumper(\@t);
+        shift @t if $t[0] =~ /^cellular/;
+        $write_md->("TAXONOMY", join("; ", @t));
     }
     $write_md->("TAXONOMY_ID", $self->{ncbi_taxonomy_id}) if $self->{ncbi_taxonomy_id};
 
@@ -2018,6 +2018,35 @@ sub n_metric {
         $cumul += $len;
         $retVal = $len;
         last if ($cumul >= $threshold);
+    }
+    # Return the length found.
+    return $retVal;
+}
+
+=head3 n_length
+
+    my $length = $gto->n_length;
+
+Compute the number of base pairs in the genome.
+
+=over 4
+
+=item RETURN
+
+Returns the DNA size of the genome.
+
+=back
+
+=cut
+
+sub n_length {
+    my ($self) = @_;
+    # Run through the contigs, collecting lengths.
+    my $contigs = $self->{contigs};
+    my $retVal = 0;
+    for my $contig (@$contigs) {
+        my $dnaLength = length $contig->{dna};
+        $retVal += $dnaLength;
     }
     # Return the length found.
     return $retVal;
