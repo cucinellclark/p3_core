@@ -55,7 +55,8 @@ use constant OBJECTS => {   genome => 'genome',
                             sample => 'transcriptomics_sample',
                             sequence => 'feature_sequence',
                             subsystem => 'subsystem_ref',
-                            subsystemItem => 'subsystem' };
+                            subsystemItem => 'subsystem',
+                            alt_feature => 'genome_feature' };
 
 =head3 FIELDS
 
@@ -65,6 +66,7 @@ Mapping from user-friendly object names to default fields.
 
 use constant FIELDS =>  {   genome => ['genome_name', 'genome_id', 'genome_status', 'sequences', 'patric_cds', 'isolation_country', 'host_name', 'disease', 'collection_year', 'completion_date'],
                             feature => ['patric_id', 'refseq_locus_tag', 'gene_id', 'plfam_id', 'pgfam_id', 'product'],
+                            alt_feature => ['feature_id', 'refseq_locus_tag', 'gene_id', 'product'],
                             family => ['family_id', 'family_type', 'family_product'],
                             genome_drug => ['genome_id', 'antibiotic', 'resistant_phenotype'],
                             contig => ['genome_id', 'accession', 'length', 'gc_content', 'sequence_type', 'topology'],
@@ -86,6 +88,7 @@ Mapping from user-friendly object names to ID column names.
 
 use constant IDCOL =>   {   genome => 'genome_id',
                             feature => 'patric_id',
+                            alt_feature => 'feature_id',
                             family => 'family_id',
                             genome_drug => 'id',
                             contig => 'sequence_id',
@@ -109,6 +112,9 @@ use constant DERIVED => {
             genome =>   {   taxonomy => ['concatSemi', 'taxon_lineage_names'],
                         },
             feature =>  {   function => ['altName', 'product'],
+                            ec => ['ecParse', 'product']
+                        },
+            alt_feature => {   function => ['altName', 'product'],
                             ec => ['ecParse', 'product']
                         },
             family =>   {
@@ -135,6 +141,10 @@ use constant DERIVED_MULTI => {
             genome =>   {
                         },
             feature =>  {   ec => 1,
+                            subsystem => 1,
+                            pathway => 1
+                        },
+            alt_feature => { ec => 1,
                             subsystem => 1,
                             pathway => 1
                         },
@@ -165,6 +175,11 @@ target table, the target table key, and the target field.
 
 use constant RELATED => {
         feature =>  {   na_sequence => ['na_sequence_md5', 'feature_sequence', 'md5', 'sequence'],
+                        aa_sequence => ['aa_sequence_md5', 'feature_sequence', 'md5', 'sequence'],
+                        pathway => ['patric_id', 'pathway', 'patric_id', 'pathway_name'],
+                        subsystem => ['patric_id', 'subsystem', 'patric_id', 'subsystem_name']
+        },
+        alt_feature => { na_sequence => ['na_sequence_md5', 'feature_sequence', 'md5', 'sequence'],
                         aa_sequence => ['aa_sequence_md5', 'feature_sequence', 'md5', 'sequence'],
                         pathway => ['patric_id', 'pathway', 'patric_id', 'pathway_name'],
                         subsystem => ['patric_id', 'subsystem', 'patric_id', 'subsystem_name']
@@ -1601,7 +1616,7 @@ sub list_object_fields {
 
 =head3 _process_entries
 
-    P3Utils::_process_entries($p3, $object, \@retList, \@entries, \@row, \@cols, $id);
+    P3Utils::_process_entries($p3, $object, \@retList, \@entries, \@row, \@cols, $id, $keyField);
 
 Process the specified results from a PATRIC query and store them in the output list.
 
