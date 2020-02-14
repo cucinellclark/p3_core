@@ -2996,7 +2996,8 @@ sub gto_of {
                           gc_content	   => $g->{gc_content},
                           }
                          );
-
+    # Denote it's a PATRIC genome.
+    $retVal->{home} = "PATRIC";
     # Get the taxonomic ranks.
     my $lineage = $g->{taxon_lineage_ids};
     if ($lineage) {
