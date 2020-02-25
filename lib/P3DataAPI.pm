@@ -3005,7 +3005,7 @@ sub gto_of {
                             "taxonomy",
                             [ "in", "taxon_id", '(' . join(',', @$lineage) . ')'],
                             ["select", "taxon_id", "taxon_name", "taxon_rank"]);
-        $retVal->{ncbi_lineage} = [map { $taxMap{$_} } @$lineage];
+        $retVal->{ncbi_lineage} = [map { $taxMap{$_} // ['<unknown>', $_, 'no rank'] } @$lineage];
     }
 
     # Get the contigs.
