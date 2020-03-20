@@ -3041,7 +3041,7 @@ sub gto_of {
                           "protein_id",    "gene_id",
                           "gi",            "gene",
                           "uniprotkb_accession", "genome_id",
-                          "pgfam_id", "plfam_id",
+                          "pgfam_id", "plfam_id", "go"
                           ]
                         );
 
@@ -3084,6 +3084,14 @@ sub gto_of {
             if ($f->{plfam_id}) {
                 push @familyList, ['PLFAM', $f->{plfam_id}];
             }
+            my @goTerms;
+            if ($f->{go}) {
+                for my $go (@{$f->{go}}) {
+                    if ($go =~ /^(GO:\d+)\|(.+)/) {
+                        push @goTerms, [$1, $2];
+                    }
+                }
+            }
             $retVal->add_feature(
                              {
                                  -annotator           => "PATRIC",
@@ -3094,6 +3102,7 @@ sub gto_of {
                                  -function            => $f->{product},
                                  -protein_translation => $sequences->{$f->{aa_sequence_md5}},
                                  -aliases             => \@aliases,
+                                 -go_terms			  => \@goTerms,
                                  -family_assignments => \@familyList
                                  }
                                 );

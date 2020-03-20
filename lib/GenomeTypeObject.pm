@@ -782,6 +782,7 @@ that feature type.
 #   -proposed_functions      => \@prop_funcs
 #   -analysis_event_id       =>  $event_id
 #   -genbank_type            =>  $gb_type
+#	-go_terms				 => \@go_terms
 #   -genbank_feature         =>  [ $gb_type, $gb_location, \%qualifiers ]
 #
 #  Special parameters generally left to default:
@@ -823,6 +824,7 @@ sub add_feature
     my $event_id     = $parms->{-analysis_event_id} || '';
     my $genbank_type = $parms->{-genbank_type};
     my $genbank_ftr  = $parms->{-genbank_feature};
+    my $go_terms     = $parms->{-go_terms};
 
     #  Process the annotations, and convert to [ $what, $whom, $when, $event ] tuples:
 
@@ -860,6 +862,7 @@ sub add_feature
     $feature->{family_assignments}      = $fam_assigns  if ref( $fam_assigns ) eq 'ARRAY';
     $feature->{similarity_associations} = $sim_assns    if ref( $sim_assns ) eq 'ARRAY';
     $feature->{feature_creation_event}  = $event_id     if $event_id;
+    $feature->{go_terms}                = $go_terms     if $go_terms && scalar @$go_terms;
 
     #  We are done creating the feature.
     #  Ensure that there is a features list in the genomeTO and add this one:
