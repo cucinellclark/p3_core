@@ -3040,8 +3040,8 @@ sub gto_of {
                           "alt_locus_tag", "refseq_locus_tag",
                           "protein_id",    "gene_id",
                           "gi",            "gene",
-                          "uniprotkb_accession", "genome_id",
-                          "pgfam_id", "plfam_id", "go"
+                          "go", "genome_id",
+                          "pgfam_id", "plfam_id"
                           ]
                         );
 
@@ -3074,9 +3074,6 @@ sub gto_of {
             push( @aliases, $f->{gene} )             if $f->{gene};
             push( @aliases, "GeneID:$f->{gene_id}" ) if $f->{gene_id};
             push( @aliases, $f->{refseq_locus_tag} ) if $f->{refseq_locus_tag};
-            if ( ref( $f->{uniprotkb_accession} ) ) {
-                push( @aliases, @{ $f->{uniprotkb_accession} } );
-            }
             my @familyList;
             if ($f->{pgfam_id}) {
                 push @familyList, ['PGFAM', $f->{pgfam_id}];
