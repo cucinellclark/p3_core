@@ -527,6 +527,21 @@ sub update_event_index
     return $event_index;
 }
 
+sub id
+{
+    my($self) = @_;
+    return $self->{id};
+}
+
+sub taxonomy_id
+{
+    my($self) = @_;
+    return $self->{ncbi_taxonomy_id} if $self->{ncbi_taxonomy_id};
+    my($t) = $self->{id} =~ /^(\d+)/;
+    return $t;
+}
+
+
 
 #
 #      @features = $genomeTO->features
