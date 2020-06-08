@@ -56,7 +56,8 @@ use constant OBJECTS => {   genome => 'genome',
                             sequence => 'feature_sequence',
                             subsystem => 'subsystem_ref',
                             subsystemItem => 'subsystem',
-                            alt_feature => 'genome_feature' };
+                            alt_feature => 'genome_feature',
+                            sp_gene => 'sp_gene' };
 
 =head3 FIELDS
 
@@ -76,6 +77,7 @@ use constant FIELDS =>  {   genome => ['genome_name', 'genome_id', 'genome_statu
                             expression => ['id', 'eid', 'genome_id', 'patric_id', 'refseq_locus_tag', 'alt_locus_tag', 'log_ratio', 'z_score'],
                             taxonomy => ['taxon_id', 'taxon_name', 'taxon_rank', 'genome_count', 'genome_length_mean'],
                             sequence => ['md5', 'sequence_type', 'sequence'],
+                            sp_gene => ['evidence', 'property', 'patric_id', 'refseq_locus_tag', 'source_id', 'gene', 'product', 'pmid', 'identity', 'e_value'],
                             subsystem => ['subsystem_id', 'subsystem_name', 'superclass', 'class', 'subclass'],
                             subsystemItem => ['id', 'subsystem_name', 'superclass', 'class', 'subclass', 'subsystem_name', 'role_name', 'active',
                                         'patric_id', 'gene', 'product'] };
@@ -98,6 +100,7 @@ use constant IDCOL =>   {   genome => 'genome_id',
                             expression => 'id',
                             taxonomy => 'taxon_id',
                             sequence => 'md5',
+                            sp_gene => 'patric_id',
                             subsystem => 'subsystem_id',
                             subsystemItem => 'id' };
 
