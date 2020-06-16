@@ -275,8 +275,7 @@ sub query
         if ($k eq 'limit') {
             $limitFound = $vals[0];
         } else {
-            my @quotedVals = map { ($_ =~ /\s/ ? "\"$_\"" : $_) } @vals;
-            my $qe = "$k(" . join( ",", @quotedVals ) . ")";
+            my $qe = "$k(" . join( ",", @vals ) . ")";
             push( @q, $qe );
         }
     }
@@ -308,7 +307,7 @@ sub query
         if (! $self->{raw}) {
             $q =~ s/([<>"#\%+\/{}\|\\\^\[\]:`'])/$P3DataAPI::EncodeMap{$1}/gs;
         }
-        $q =~ s/ /\%20/;
+        $q =~ s/ /+/g;
         # POST query - we retry 5 times after error
         my ($resp, $data) = $self->submit_query($core, $q);
         # print STDERR $resp->content;
