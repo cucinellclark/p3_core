@@ -307,7 +307,7 @@ sub query
         if (! $self->{raw}) {
             $q =~ s/([<>"#\%+\/{}\|\\\^\[\]:`'])/$P3DataAPI::EncodeMap{$1}/gs;
         }
-        $q =~ tr/ /+/;
+        $q =~ s/ /+/g;
         # POST query - we retry 5 times after error
         my ($resp, $data) = $self->submit_query($core, $q);
         # print STDERR $resp->content;
