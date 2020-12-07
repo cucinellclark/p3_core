@@ -948,6 +948,7 @@ sub retrieve_protein_features_in_genome_in_export_format {
     $self->query_cb("genome_feature",
                     $on_feature,
                     [ "eq",     "feature_type", "CDS" ],
+                    [ "eq",     "annotation",    "PATRIC" ],
                     [ "eq",     "genome_id",    $genome_id ],
                     [ "select", "patric_id,aa_sequence_md5,genome_name,product" ],
                    );
@@ -3044,7 +3045,7 @@ sub gto_of {
                           "pgfam_id", "plfam_id"
                           ]
                         );
-
+# print STDERR Dumper(\@f);
     my %md5s = map { $_->{aa_sequence_md5} => 1 } grep { $_ } @f;
     my $sequences = $self->lookup_sequence_data_hash([ keys %md5s ]);
 
