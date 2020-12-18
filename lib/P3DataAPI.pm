@@ -882,6 +882,23 @@ sub retrieve_protein_features_in_genomes {
     close($id_map_fh);
 }
 
+sub retrieve_patricids_from_feature_group {
+    my ( $self, $feature_group_path) = @_;
+
+    my @names = ();
+    $self->query_cb("genome_feature",
+                    sub {
+                        my ($data) = @_;
+                        for my $ent (@$data) {
+                            push @names, $ent->{patric_id}
+                        }
+                        return 1;
+                    },
+                    [ "in",     "feature_id", "FeatureGroup(" . uri_escape($feature_group_path) . ")"]
+                   );
+    return \@names
+}
+
 sub retrieve_protein_feature_sequence {
     my ( $self, $fids) = @_;
 
@@ -903,6 +920,43 @@ sub retrieve_protein_feature_sequence {
                     [ "eq",     "feature_type", "CDS" ],
                     [ "in",     "patric_id", "(" . join(",", map { uri_escape($_) } @$fids) . ")"],
                     [ "select", "patric_id,aa_sequence_md5" ],
+                   );
+
+    #
+    # Query for sequences.
+    #
+
+    my $seqs = $self->lookup_sequence_data_hash([keys %map]);
+
+    my %out;
+    while ( my ( $k, $v ) = each %map )
+    {
+        $out{$_} = $seqs->{$k} foreach @$v;
+    }
+    return \%out;
+}
+
+sub retrieve_nucleotide_feature_sequence {
+    my ( $self, $fids) = @_;
+
+    my %map;
+
+    #
+    # Query for features.
+    #
+
+    $self->query_cb("genome_feature",
+                    sub {
+                        my ($data) = @_;
+                        for my $ent (@$data) {
+                            push(@{ $map{ $ent->{na_sequence_md5} } },
+                                 $ent->{patric_id});
+                        }
+                        return 1;
+                    },
+                    [ "eq",     "feature_type", "CDS" ],
+                    [ "in",     "patric_id", "(" . join(",", map { uri_escape($_) } @$fids) . ")"],
+                    [ "select", "patric_id,na_sequence_md5" ],
                    );
 
     #
