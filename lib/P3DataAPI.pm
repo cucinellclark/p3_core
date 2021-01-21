@@ -954,7 +954,6 @@ sub retrieve_nucleotide_feature_sequence {
                         }
                         return 1;
                     },
-                    [ "eq",     "feature_type", "CDS" ],
                     [ "in",     "patric_id", "(" . join(",", map { uri_escape($_) } @$fids) . ")"],
                     [ "select", "patric_id,na_sequence_md5" ],
                    );
