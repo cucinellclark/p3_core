@@ -100,7 +100,7 @@ __PACKAGE__->mk_accessors(qw(benchmark chunk_size url ua reference_genome_cache
                             ));
 
 our %EncodeMap = ('<' => '%60', '=' => '%61', '>' => '%62', '"' => '%34', '#' => '%35', '%' => '%37',
-                  '+' => '%43', '/' => '%47', ':' => '%58', '{' => '%7B', '|' => '%7C', '}' => '%7D',
+                  '+' => '%43', '/' => '%47', ':' => '%3A', '{' => '%7B', '|' => '%7C', '}' => '%7D',
                   '^' => '%94', '`' => '%96', '&' => '%26', "'" => '%27');
 
 sub new {
@@ -954,7 +954,6 @@ sub retrieve_nucleotide_feature_sequence {
                         }
                         return 1;
                     },
-                    [ "eq",     "feature_type", "CDS" ],
                     [ "in",     "patric_id", "(" . join(",", map { uri_escape($_) } @$fids) . ")"],
                     [ "select", "patric_id,na_sequence_md5" ],
                    );
