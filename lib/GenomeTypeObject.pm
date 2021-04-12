@@ -205,6 +205,7 @@ The object will be rendered unusable (i.e., unblessed)
 #
 #        condensed => $bool   #  If true, do not invoke 'pretty'
 #        pretty    => $bool   #  If explicitly false, do not invoke 'pretty'
+#	 canonical => $bool   # If true, set canonical form 
 #
 sub destroy_to_file
 {
@@ -651,7 +652,7 @@ sub analysis_events
     #
     # Patch incomplete genome object.
     #
-    if (!exists $self->{features})
+    if (!exists $self->{analysis_events})
     {
         $self->{analysis_events} = [];
     }
@@ -1125,7 +1126,7 @@ sub write_seed_dir
     my @t = @{$self->{taxonomy}};
     shift @t if $t[0] =~ /^cellular/;
 
-    print Dumper(\@t);
+    # print Dumper(\@t);
     $write_md->("TAXONOMY", join("; ", @t));
     }
     elsif (my $t = $self->{taxonomy})
@@ -1137,7 +1138,7 @@ sub write_seed_dir
     elsif (ref(my $lin = $self->{ncbi_lineage}))
     {
         my @t = map { $_->[0] } @$lin;
-        print Dumper(\@t);
+        # print Dumper(\@t);
         shift @t if $t[0] =~ /^cellular/;
         $write_md->("TAXONOMY", join("; ", @t));
     }
@@ -1161,7 +1162,7 @@ sub write_seed_dir
     }
     $typemap{CDS} = 'peg' if $options->{map_CDS_to_peg};
     @types = grep { $_ } values %typemap;
-    print Dumper(\@types, \%typemap);
+    # print Dumper(\@types, \%typemap);
 
     #
     # closest.genomes file.
