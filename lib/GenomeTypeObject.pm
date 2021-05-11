@@ -350,7 +350,7 @@ sub set_metadata
 {
     my($self, $meta) = @_;
 
-    my @keys = qw(id scientific_name domain genetic_code source source_id taxonomy ncbi_taxonomy_id owner);
+    my @keys = qw(id scientific_name domain genetic_code source source_id taxonomy ncbi_taxonomy_id ncbi_lineage owner);
     for my $k (@keys)
     {
         if (exists($meta->{$k}))

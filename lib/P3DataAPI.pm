@@ -2980,7 +2980,7 @@ sub function_of
   my $md = get_taxon_metadata($taxon_id)
 
 Compute basic taxon metadat for a given C<$taxon_id>. Returns a hash
-with keys C<domain>, C<taxon_name>, C<taxon_id>, C<genetic_code>.
+with keys C<domain>, C<taxon_name>, C<taxon_id>, C<genetic_code>, C<taxon_lineage>.
 
 =cut
 
@@ -2990,15 +2990,27 @@ sub get_taxon_metadata
 
     my @t = $self->query("taxonomy",
 			 ["eq", "taxon_id", $taxon_id],
-			 ["select", "genetic_code,taxon_name,lineage_names"]);
+			 ["select", "genetic_code,taxon_name,lineage_names,lineage_ids,lineage_ranks"]);
 
     my $t = $t[0];
     my $lin = $t->{lineage_names};
+    my $ids = $t->{lineage_ids};
+    my $ranks = $t->{lineage_ranks};
     my $domain;
+    my @lineage = ();
     if (ref($lin))
     {
-	shift @$lin if $lin->[0] eq 'cellular organisms';
+ 	if ($lin->[0] eq 'cellular organisms')
+	{
+	    shift @$lin;
+	    shift @$ids;
+	    shift @$ranks;
+	}
 	# Compute the domain.
+	for my $i (0..$#$lin)
+	{
+	    push @lineage, [$lin->[$i], $ids->[$i], $ranks->[$i]];
+	}
 	$domain = $lin->[0];
     }
 
@@ -3011,6 +3023,7 @@ sub get_taxon_metadata
 	taxon_name => $t->{taxon_name},
 	genetic_code => $genetic_code,
 	domain => $domain,
+	taxon_lineage => \@lineage,
     };
     return $ret;
 }
