@@ -296,7 +296,7 @@ sub query
             $lim = "limit($limitFound,0)";
             $done = 1;
         }
-        my $q   = "$qstr&$lim";
+	my $q   = "$qstr&$lim";
 
         #       print STDERR "Qry $url '$q'\n";
         #	my $resp = $ua->post($url,
@@ -305,7 +305,7 @@ sub query
         my $end;
         # Form url-encoding
         if (! $self->{raw}) {
-            $q =~ s/([<>"#\%+\/{}\|\\\^\[\]:`'])/$P3DataAPI::EncodeMap{$1}/gs;
+	    $q = $self->url_encode($q);
         }
         $q =~ s/ /+/g;
         # POST query - we retry 5 times after error
@@ -313,7 +313,7 @@ sub query
         # print STDERR $resp->content;
 
         push @result, @$data;
-
+		     
         #        print STDERR scalar(@$data) . " results found.\n";
         my $r = $resp->header('content-range');
 
@@ -355,7 +355,7 @@ sub submit_query {
         print $g_log_fh strftime("%Y-%m-%d %H:%M:%S", localtime $t1) . sprintf(".%03d %.3f", $ms, $elap) . " " . $response->code . " $$ $core " . $response->header("Content-Length") . "\n";
     }
 #        print STDERR Dumper($response);
-        my $error;
+        my $error; 
         if ( $response->is_success ) {
             eval {
                 $data = decode_json($response->content);
@@ -2975,6 +2975,46 @@ sub function_of
     return \%out;
 }
 
+=head3 get_taxon_metadata
+
+  my $md = get_taxon_metadata($taxon_id)
+
+Compute basic taxon metadat for a given C<$taxon_id>. Returns a hash
+with keys C<domain>, C<taxon_name>, C<taxon_id>, C<genetic_code>.
+
+=cut
+
+sub get_taxon_metadata
+{
+    my($self, $taxon_id) = @_;
+
+    my @t = $self->query("taxonomy",
+			 ["eq", "taxon_id", $taxon_id],
+			 ["select", "genetic_code,taxon_name,lineage_names"]);
+
+    my $t = $t[0];
+    my $lin = $t->{lineage_names};
+    my $domain;
+    if (ref($lin))
+    {
+	shift @$lin if $lin->[0] eq 'cellular organisms';
+	# Compute the domain.
+	$domain = $lin->[0];
+    }
+
+    # Compute the genetic code.
+
+    my $genetic_code = $t->{genetic_code} // 11;
+
+    my $ret = {
+	taxon_id => $taxon_id,
+	taxon_name => $t->{taxon_name},
+	genetic_code => $genetic_code,
+	domain => $domain,
+    };
+    return $ret;
+}
+
 =head3 gto_of
 
     my $gto = $d->gto_of($genomeID);
@@ -3351,5 +3391,16 @@ sub _log {
         print $lh $message;
     }
 }
+
+#
+# I shoved this down here because the regexp makes autoindenter puke.
+#
+sub url_encode
+{
+    my($self, $q) = @_;
+    $q =~ s/([<>"#\%+\/{}\|\\\^\[\]:`'])/$P3DataAPI::EncodeMap{$1}/gs;
+    return $q;
+}
+
 
 1;
