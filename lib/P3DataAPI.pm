@@ -3119,13 +3119,14 @@ sub gto_of {
     my @contigs = $self->query(
                                "genome_sequence",
                                [ "eq",     "genome_id",   $genomeID ],
-                               [ "select", "sequence_id", "sequence" ]
+                               [ "select", "sequence_id", "sequence", "accession" ]
                               );
     my @gto_contigs;
     for my $contig (@contigs) {
         push @gto_contigs,
     {
         id           => $contig->{sequence_id},
+        original_id  => $contig->{accession},
         dna          => $contig->{sequence},
         genetic_code => $genetic_code
         };
