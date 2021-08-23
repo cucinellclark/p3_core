@@ -583,6 +583,44 @@ sub solr_query_raw
     }
 }
 
+sub solr_query_raw_list
+{
+    my($self, $core, $params) = @_;
+
+    my $uri = URI->new($self->url . "/$core");
+
+    my($s, $e);
+
+    if ($self->debug)
+    {
+        $s = gettimeofday;
+        print STDERR "SQ: $uri @$params\n";
+    }
+    # print STDERR "Query url: $uri\n";
+
+    my $res = $self->ua->post($uri,
+                              $params,
+                             "Content-type" => "application/solrquery+x-www-form-urlencoded",
+                             "Accept", "application/solr+json",
+                             $self->auth_header,
+                            );
+    if ($self->debug)
+    {
+        my $e = gettimeofday;
+        my $elap = $e - $s;
+        print STDERR "Done elap=$elap\n";
+    }
+    if ($res->is_success)
+    {
+        my $out = decode_json($res->content);
+        return $out;
+    }
+    else
+    {
+        die "Query failed: " . $res->code . " " . $res->content;
+    }
+}
+
 sub solr_query_raw_multi
 {
     my($self, $queries) = @_;
@@ -693,6 +731,37 @@ sub solr_query
     return \@out;
 }
 
+#
+# Invoke solr_query_raw_list repeatedly to get all values.
+#
+
+sub solr_query_list
+{
+    my($self, $core, $params, $max_count) = @_;
+
+    my $start = 0;
+    my $block_size = 25000;
+    my $count = (!defined($max_count) || $max_count > $block_size) ? $block_size : $max_count;
+
+    my $n = 0;
+    my @out;
+    while (1)
+    {
+        my $doc = $self->solr_query_raw_list($core, [ @$params, start => $start, rows => $count ]);
+        ref($doc) eq 'HASH' or die "solr query failed: " . Dumper($doc, $params);
+        my $resp = $doc->{response};
+        my $ndocs = @{$resp->{docs}};
+        $n += $ndocs;
+
+        # print STDERR "ndocs=$ndocs $n=$n nfound=$resp->{numFound}\n";
+        push(@out, @{$resp->{docs}});
+
+        $start += $ndocs;
+        last if (defined($max_count) && $n >= $max_count) || $n >= $resp->{numFound};
+    }
+    return \@out;
+}
+
 sub retrieve_contigs_in_genomes {
     my ( $self, $genome_ids, $target_dir, $path_format ) = @_;
 
@@ -726,6 +795,36 @@ sub retrieve_contigs_in_genomes {
         close($gid_fh);
     }
 
+}
+
+sub retrieve_contigs_in_genomes_to_temp {
+    my ( $self, $genome_ids ) = @_;
+
+    my $temp = File::Temp->new();
+    
+    for my $gid (@$genome_ids) {
+        my $gid_fh;
+
+        $self->query_cb(
+            "genome_sequence",
+            sub {
+                my ($data) = @_;
+                for my $ent (@$data) {
+                    print_alignment_as_fasta(
+                        $temp,
+                        [
+                            "accn|$ent->{sequence_id}",
+"$ent->{description} [ $ent->{genome_name} | $ent->{genome_id} ]",
+                            $ent->{sequence}
+                        ]
+                    );
+                }
+                return 1;
+            },
+            [ "eq", "genome_id", $gid ]
+        );
+    }
+    return $temp;
 }
 
 =head3 B<lookup_sequence_data>
@@ -941,6 +1040,8 @@ sub retrieve_nucleotide_feature_sequence {
 
     my %map;
 
+    return {} if @$fids == 0;
+
     #
     # Query for features.
     #
@@ -1015,17 +1116,16 @@ sub retrieve_protein_features_in_genomes_to_temp {
 
     my $temp = File::Temp->new();
 
-    my %map;
 
     my $ret_list;
     $ret_list = [] if wantarray;
 
     for my $gid (@$genome_ids) {
+	my %map;
         $self->query_cb(
             "genome_feature",
             sub {
                 my ($data) = @_;
-
                 my %by_md5;
 
                 $self->lookup_sequence_data([map { $_->{aa_sequence_md5} } @$data ], sub {
@@ -1048,7 +1148,7 @@ sub retrieve_protein_features_in_genomes_to_temp {
              [ "eq", "annotation", "PATRIC"],
             [ "eq",     "genome_id",    $gid ],
             [ "select", "patric_id,product,aa_sequence_md5,plfam_id,pgfam_id" ],
-        );
+		       );
     }
     close($temp);
     return wantarray ? ($temp, $ret_list) : $temp;
@@ -1272,6 +1372,78 @@ sub retrieve_dna_features_in_genomes {
         print $id_map_fh join( "\t", $k, @$v ), "\n";
     }
     close($id_map_fh);
+}
+sub retrieve_dna_features_in_genomes_to_temp {
+    my ( $self, $genome_ids) = @_;
+
+    my $fasta_fh = File::Temp->new;
+
+    my %map;
+
+    for my $gid (@$genome_ids) {
+        $self->query_cb(
+            "genome_feature",
+            sub {
+                my ($data) = @_;
+                for my $ent (@$data) {
+                    push( @{ $map{$ent->{na_sequence_md5}} }, $ent->{patric_id} );
+                }
+                return 1;
+            },
+                        [ "eq",     "genome_id", $gid ],
+                        [ "eq", "patric_id", "*"],
+                        [ "select", "patric_id,na_sequence_md5" ],
+        );
+    }
+    #
+    # Query for sequences.
+    #
+    $self->lookup_sequence_data([keys %map], sub {
+        my($ent) = @_;
+	for my $id (@{$map{$ent->{md5}}})
+	{
+	    print_alignment_as_fasta($fasta_fh, [$id, undef, $ent->{sequence}]);
+	}
+    });
+
+    return $fasta_fh;
+}
+
+sub retrieve_rna_features_in_genomes_to_temp {
+    my ( $self, $genome_ids) = @_;
+
+    my $fasta_fh = File::Temp->new;
+
+    my %map;
+
+    for my $gid (@$genome_ids) {
+        $self->query_cb(
+            "genome_feature",
+            sub {
+                my ($data) = @_;
+                for my $ent (@$data) {
+                    push( @{ $map{$ent->{na_sequence_md5}} }, $ent->{patric_id} );
+                }
+                return 1;
+            },
+                        [ "eq",     "genome_id", $gid ],
+                        [ "eq", "patric_id", "*"],
+			[ "eq", "feature_type", "*rna"],
+                        [ "select", "patric_id,na_sequence_md5" ],
+        );
+    }
+    #
+    # Query for sequences.
+    #
+    $self->lookup_sequence_data([keys %map], sub {
+        my($ent) = @_;
+	for my $id (@{$map{$ent->{md5}}})
+	{
+	    print_alignment_as_fasta($fasta_fh, [$id, undef, $ent->{sequence}]);
+	}
+    });
+
+    return $fasta_fh;
 }
 
 #
