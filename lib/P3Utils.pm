@@ -57,7 +57,12 @@ use constant OBJECTS => {   genome => 'genome',
                             subsystem => 'subsystem_ref',
                             subsystemItem => 'subsystem',
                             alt_feature => 'genome_feature',
-                            sp_gene => 'sp_gene' };
+                            sp_gene => 'sp_gene',
+                            protein_region => 'protein_feature',
+                            protein_structure => 'protein_structure',
+                            surveillance => 'surveillance',
+                            serology => 'serology',
+};
 
 =head3 FIELDS
 
@@ -80,7 +85,19 @@ use constant FIELDS =>  {   genome => ['genome_name', 'genome_id', 'genome_statu
                             sp_gene => ['evidence', 'property', 'patric_id', 'refseq_locus_tag', 'source_id', 'gene', 'product', 'pmid', 'identity', 'e_value'],
                             subsystem => ['subsystem_id', 'subsystem_name', 'superclass', 'class', 'subclass'],
                             subsystemItem => ['id', 'subsystem_name', 'superclass', 'class', 'subclass', 'subsystem_name', 'role_name', 'active',
-                                        'patric_id', 'gene', 'product'] };
+                                        'patric_id', 'gene', 'product'],
+                            protein_region => ['patric_id', 'refseq_locus_tag', 'gene', 'product', 'source', 'source_id', 'description',
+                                        'e_value', 'evidence'],
+                            protein_structure => ['pdb_id', 'title', 'organism_name', 'patric_id', 'uniprotkb_accession',
+                                        'gene', 'product', 'method', 'release_date'],
+                            surveillance => ['sample_identifier', 'sample_material', 'collector_institution', 'collection_year',
+                                             'collection_country', 'pathogen_test_type', 'pathogen_test_result'. 'type',
+                                             'subtype', 'strain', 'host_identifier', 'host_species', 'host_common_name',
+                                             'host_age', 'host_health'],
+                            serology => ['sample_identifier', 'host_identifier', 'host_type', 'host_species', 'host_common_name',
+                                            'host_sex', 'host_age', 'host_age_group', 'host_health', 'collection_date', 'test_type', 'test_result',
+                                            'serotype'],
+};
 
 =head3 IDCOL
 
@@ -102,7 +119,12 @@ use constant IDCOL =>   {   genome => 'genome_id',
                             sequence => 'md5',
                             sp_gene => 'patric_id',
                             subsystem => 'subsystem_id',
-                            subsystemItem => 'id' };
+                            subsystemItem => 'id',
+                            protein_region => 'id',
+                            protein_structure => 'pdb_id',
+                            surveillance => 'sample_identifier',
+                            serology => 'sample_identifier',
+                        };
 
 =head3 DERIVED
 
@@ -137,7 +159,16 @@ use constant DERIVED => {
             subsystem => {
                         },
             subsystemItem => {
-                        }
+                        },
+            protein_region => {
+                        },
+            protein_structure => {
+                        },
+            surveillance => {
+                        },
+            serology => {
+                        },
+
 };
 
 use constant DERIVED_MULTI => {
@@ -166,7 +197,16 @@ use constant DERIVED_MULTI => {
             subsystem => {
                         },
             subsystemItem => {
-                        }
+                        },
+            protein_region => {
+                        },
+            protein_structure => {
+                        },
+            surveillance => {
+                        },
+            serology => {
+                        },
+
 };
 
 =head3 RELATED
@@ -187,7 +227,8 @@ use constant RELATED => {
                         pathway => ['patric_id', 'pathway', 'patric_id', 'pathway_name'],
                         subsystem => ['patric_id', 'subsystem', 'patric_id', 'subsystem_name']
         },
-        genome => 	{	genetic_code => ['taxon_id', 'taxonomy', 'taxon_id', 'genetic_code']}
+        genome => 	{	genetic_code => ['taxon_id', 'taxonomy', 'taxon_id', 'genetic_code'] },
+        protein =>  {   aa_sequence => ['aa_sequence_md5', 'feature_sequence', 'md5', 'sequence'] },
 };
 
 
