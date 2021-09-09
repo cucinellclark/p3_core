@@ -2708,7 +2708,7 @@ sub get_pin
             push(@out, $match);
         }
         close ($blast);
-#    $#out = $max_size - 1 if $max_size;
+	$#out = $max_size - 1 if $max_size && @out > $max_size - 1;
     }
     else
     {
