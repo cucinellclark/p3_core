@@ -575,6 +575,10 @@ sub solr_query_raw
     if ($res->is_success)
     {
         my $out = decode_json($res->content);
+	if ($self->debug)
+	{
+	    print STDERR " solr qtime $out->{responseHeader}->{QTime}\n";
+	}
         return $out;
     }
     else
@@ -1678,19 +1682,19 @@ sub compare_regions_for_peg
     {
         print STDERR "$peg rep filter\n";
         $genome_filter = sub { $self->is_reference_genome($_[0]) eq 'Representative' };
-        $solr_filter = $self->representative_genome_filter();
+        $solr_filter = $self->representative_genome_filter(1);
     }
     elsif ($genome_filter_str eq 'reference')
     {
         print STDERR "$peg ref filter\n";
         $genome_filter = sub { $self->is_reference_genome($_[0]) eq 'Reference' };
-        $solr_filter = $self->reference_genome_filter();
+        $solr_filter = $self->reference_genome_filter(1);
     }
     elsif ($genome_filter_str eq 'representative+reference')
     {
         print STDERR "$peg repref filter\n";
         $genome_filter = sub { $self->is_reference_genome($_[0]) ne '' };
-        $solr_filter = $self->representative_reference_genome_filter();
+        $solr_filter = $self->representative_reference_genome_filter(1);
     }
 
     my %seqs;
@@ -2460,7 +2464,7 @@ sub get_pin_p3
         return ($res->[0]);
     }
 
-    my $pin = $self->members_of_family($fam, $family_type, $solr_filter, $fid, $max_size * 10000);
+    my $pin = $self->members_of_family($fam, $family_type, $solr_filter, $fid, $solr_filter ? $max_size : $max_size * 10);
 
     my $me;
     my @cut_pin;
@@ -2650,6 +2654,7 @@ sub get_pin
             print $tmp_fh ">$md5\n$seq\n";
         }
         close($tmp_fh);
+
         my $rc = system("formatdb", "-p", "t", "-i", $tmp);
         $rc == 0 or die "formatdb failed with $rc\n";
 
@@ -3072,8 +3077,19 @@ sub members_of_family
     my $fam_field = $family_field_of_type{lc($family_type)};
     $fam_field or die "Unknown family type '$family_type'\n";
 
-    my $q = join(" AND ", "$fam_field:$fam", $solr_filter ? "($solr_filter OR patric_id:$fid)" : ());
-    my $res = $self->solr_query("genome_feature", { q => $q, fl => "patric_id,aa_sequence_md5,accession,start,end,genome_id,genome_name,strand" }, $max_count);
+    my @q;
+    push(@q, q => "$fam_field:$fam OR patric_id:$fid");
+    if ($solr_filter)
+    {
+	push(@q, fq => $solr_filter . "," . genome_of($fid));
+    }
+    push(@q, fl => "patric_id,aa_sequence_md5,accession,start,end,genome_id,genome_name,strand");
+
+    # my $q = join(" AND ", "$fam_field:$fam", $solr_filter ? "($solr_filter OR patric_id:$fid)" : ());
+    # my $res = $self->solr_query("genome_feature", { q => $q, fl => "patric_id,aa_sequence_md5,accession,start,end,genome_id,genome_name,strand" }, $max_count);
+
+    my $res = $self->solr_query_list("genome_feature", \@q, $max_count);
+
     #
     # need to rewrite start/end for neg strand
     #
@@ -3490,9 +3506,9 @@ sub is_reference_genome
     return $cache->{$genome}->{reference_genome};
 }
 
-sub representative_reference_genome_filter
+sub representative_reference_genome
 {
-    my($self) = @_;
+    my($self, $for_fq) = @_;
 
     my $cache = $self->reference_genome_cache;
     if (!$cache)
@@ -3500,12 +3516,15 @@ sub representative_reference_genome_filter
         $cache = $self->fill_reference_genome_cache();
     }
     my @list = grep { $cache->{$_} ne '' } keys %$cache;
-    return "genome_id:(" . join(" OR ", @list) . ")";
+    return
+	$for_fq
+	? "{!terms f=genome_id}" . join(",", @list)
+	:  "genome_id:(" . join(" OR ", @list) . ")";
 }
 
 sub representative_genome_filter
 {
-    my($self) = @_;
+    my($self, $for_fq) = @_;
 
     my $cache = $self->reference_genome_cache;
     if (!$cache)
@@ -3513,12 +3532,15 @@ sub representative_genome_filter
         $cache = $self->fill_reference_genome_cache();
     }
     my @list = grep { $cache->{$_}->{reference_genome} eq 'Representative' } keys %$cache;
-    return "genome_id:(" . join(" OR ", @list) . ")";
+    return
+	$for_fq
+	? "{!terms f=genome_id}" . join(",", @list)
+	:  "genome_id:(" . join(" OR ", @list) . ")";
 }
 
 sub reference_genome_filter
 {
-    my($self) = @_;
+    my($self, $for_fq) = @_;
 
     my $cache = $self->reference_genome_cache;
     if (!$cache)
@@ -3526,7 +3548,11 @@ sub reference_genome_filter
         $cache = $self->fill_reference_genome_cache();
     }
     my @list = grep { $cache->{$_}->{reference_genome} eq 'Reference' } keys %$cache;
-    return "genome_id:(" . join(" OR ", @list) . ")";
+    return
+	$for_fq
+	? "{!terms f=genome_id}" . join(",", @list)
+	:  "genome_id:(" . join(" OR ", @list) . ")";
+
 }
 
 sub fill_reference_genome_cache
