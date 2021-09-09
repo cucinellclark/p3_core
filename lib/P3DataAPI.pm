@@ -3506,7 +3506,7 @@ sub is_reference_genome
     return $cache->{$genome}->{reference_genome};
 }
 
-sub representative_reference_genome
+sub representative_reference_genome_filter
 {
     my($self, $for_fq) = @_;
 
