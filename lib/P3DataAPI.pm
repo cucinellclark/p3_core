@@ -4,7 +4,7 @@ package P3DataAPI;
 
 # Updated for new PATRIC.
 
-use File::Temp;
+use File::Temp qw(:seekable);
 use LWP::UserAgent;
 use strict;
 use POSIX qw(strftime);
@@ -1148,7 +1148,7 @@ sub retrieve_protein_features_in_genomes_to_temp {
                 }
                 return 1;
             },
-            [ "eq",     "feature_type", "CDS" ],
+            [ "in",     "feature_type", "(mat_peptide,CDS)" ],
              [ "eq", "annotation", "PATRIC"],
             [ "eq",     "genome_id",    $gid ],
             [ "select", "patric_id,product,aa_sequence_md5,plfam_id,pgfam_id" ],
