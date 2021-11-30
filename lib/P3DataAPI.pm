@@ -1122,7 +1122,7 @@ sub retrieve_protein_features_in_genome_in_export_format {
 
     $self->query_cb("genome_feature",
                     $on_feature,
-                    [ "eq",     "feature_type", "CDS" ],
+                    [ "in",     "feature_type", "(mat_peptide,CDS)" ],
                     [ "eq",     "annotation",    "PATRIC" ],
                     [ "eq",     "genome_id",    $genome_id ],
                     [ "select", "patric_id,aa_sequence_md5,genome_name,product" ],
@@ -1343,7 +1343,7 @@ sub retrieve_protein_features_in_genomes_with_role {
 
                 return 1;
             },
-            [ "eq", "feature_type", "CDS" ],
+	    [ "in",     "feature_type", "(mat_peptide,CDS)" ],
             [ "eq", "annotation",   "PATRIC" ],
             [ "eq", "genome_id",    $gid ],
             [ "eq", "product",      $role ],
