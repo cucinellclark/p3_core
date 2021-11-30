@@ -1037,7 +1037,7 @@ sub retrieve_protein_feature_sequence {
                         }
                         return 1;
                     },
-                    [ "eq",     "feature_type", "CDS" ],
+                    [ "in",     "feature_type", "(mat_peptide,CDS)" ],
                     [ "in",     "patric_id", "(" . join(",", map { uri_escape($_) } @$fids) . ")"],
                     [ "select", "patric_id,aa_sequence_md5" ],
                    );
