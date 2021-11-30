@@ -1002,6 +1002,23 @@ sub retrieve_patricids_from_feature_group {
     return \@names
 }
 
+sub retrieve_patric_ids_from_genome_group {
+    my ( $self, $genome_group_path) = @_;
+
+    my @names = ();
+    $self->query_cb("genome",
+                    sub {
+                        my ($data) = @_;
+                        for my $ent (@$data) {
+                            push @names, $ent->{genome_id}
+                        }
+                        return 1;
+                    },
+                    [ "in",     "genome_id", "GenomeGroup(" . uri_escape($genome_group_path) . ")"]
+                   );
+    return \@names
+}
+
 sub retrieve_protein_feature_sequence {
     my ( $self, $fids) = @_;
 
