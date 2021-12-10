@@ -1259,14 +1259,18 @@ sub write_seed_dir
         }
         elsif ($type eq 'peg' || $type eq 'CDS')
         {
-        my $dna = $self->get_feature_dna($feature->{id});
-        my $code = SeedUtils::genetic_code($self->{genetic_code});
-        my $aa = SeedUtils::translate($dna, $code, 1);
-            write_fasta($fasta_fh{$type}, [$fid, undef, $aa]);
+	    my $dna = $self->get_feature_dna($feature->{id});
+	    if ($dna)
+	    {
+		my $code = SeedUtils::genetic_code($self->{genetic_code});
+		my $aa = SeedUtils::translate($dna, $code, 1);
+		write_fasta($fasta_fh{$type}, [$fid, undef, $aa]);
+	    }
         }
     else
-        {
-            write_fasta($fasta_fh{$type}, [$fid, undef, $self->get_feature_dna($feature->{id})]);
+    {
+	    my $dna = $self->get_feature_dna($feature->{id});
+            write_fasta($fasta_fh{$type}, [$fid, undef, $dna]) if $dna;
         }
 
         # typedef tuple<string comment, string annotator, int annotation_time, analysis_event_id> annotation;
@@ -1464,6 +1468,7 @@ sub get_feature_dna
         my($contig, $beg, $strand, $len) = @$loc;
 
         my $cobj = $self->find_contig($contig);
+	next unless defined($cobj->{dna});
 
         if ($strand eq '+' || $len == 1)
         {
