@@ -992,12 +992,14 @@ sub retrieve_patricids_from_feature_group {
     $self->query_cb("genome_feature",
                     sub {
                         my ($data) = @_;
-                        for my $ent (@$data) {
-                            push @names, $ent->{patric_id}
-                        }
+			push @names, grep { $_ } map { $_->{patric_id} } @$data;
+                        #for my $ent (@$data) {
+			#push @names, $ent->{patric_id};
+                        #}
                         return 1;
                     },
-                    [ "in",     "feature_id", "FeatureGroup(" . uri_escape($feature_group_path) . ")"]
+                    [ "in",     "feature_id", "FeatureGroup(" . uri_escape($feature_group_path) . ")"],
+		    ['select', 'patric_id,feature_id']
                    );
     return \@names
 }
