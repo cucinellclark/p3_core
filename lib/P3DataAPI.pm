@@ -1004,8 +1004,54 @@ sub retrieve_patricids_from_feature_group {
     return \@names
 }
 
+sub retrieve_protein_sequences_from_feature_group {
+    my ( $self, $feature_group_path, $fields) = @_;
+
+    return $self->retrieve_sequences_from_feature_group($feature_group_path, 'aa', $fields);
+}
+
+sub retrieve_nucleotide_sequences_from_feature_group {
+    my ( $self, $feature_group_path, $fields) = @_;
+
+    return $self->retrieve_sequences_from_feature_group($feature_group_path, 'na', $fields);
+}
+
+sub retrieve_sequences_from_feature_group {
+    my ( $self, $feature_group_path, $type, $fields) = @_;
+
+    $fields //= [];
+
+    $type eq 'na' or $type eq 'aa' or die "retrieve_protein_sequences_from_feature_group: Invalid type $type\n";
+    
+    my $key = "${type}_sequence_md5";
+    my %map;
+
+    push(@$fields, $key, qw(patric_id feature_id accession annotation));
+    my $sel = join(",", @$fields);
+	 
+
+    $self->query_cb("genome_feature",
+                    sub {
+                        my ($data) = @_;
+			$map{$_->{$key}} = $_ foreach @$data;
+                        return 1;
+                    },
+                    [ "in",     "feature_id", "FeatureGroup(" . uri_escape($feature_group_path) . ")"],
+		    ['select', $sel]
+                   );
+    my $seqs = $self->lookup_sequence_data_hash([keys %map]);
+
+    my @out;
+    while (my($k, $v) = each %map)
+    {
+	$v->{sequence} = $seqs->{$k};
+	push(@out, $v);
+    }
+    return \@out;
+}
+
 sub retrieve_patric_ids_from_genome_group {
-    my ( $self, $genome_group_path) = @_;
+    my ( $self, $genome_group_path, $fields) = @_;
 
     my @names = ();
     $self->query_cb("genome",
