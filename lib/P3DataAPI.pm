@@ -1033,19 +1033,24 @@ sub retrieve_sequences_from_feature_group {
     $self->query_cb("genome_feature",
                     sub {
                         my ($data) = @_;
-			$map{$_->{$key}} = $_ foreach @$data;
+			push(@{$map{$_->{$key}}}, $_) foreach @$data;
                         return 1;
                     },
                     [ "in",     "feature_id", "FeatureGroup(" . uri_escape($feature_group_path) . ")"],
 		    ['select', $sel]
                    );
+    # print STDERR Dumper(\%map);
     my $seqs = $self->lookup_sequence_data_hash([keys %map]);
+    # print STDERR "Seqcount " . scalar(keys %$seqs) . "\n";
 
     my @out;
     while (my($k, $v) = each %map)
     {
-	$v->{sequence} = $seqs->{$k};
-	push(@out, $v);
+	for my $ent (@$v)
+	{
+	    $ent->{sequence} = $seqs->{$k};
+	    push(@out, $ent);
+	}
     }
     return \@out;
 }
