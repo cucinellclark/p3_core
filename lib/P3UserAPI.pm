@@ -41,10 +41,14 @@ if ($^O eq 'MSWin32')
     $token_path = "$ENV{HOME}/.patric_token";
 }
 
+our %EncodeMap = ('<' => '%60', '=' => '%61', '>' => '%62', '"' => '%34', '#' => '%35', '%' => '%37',
+                  '+' => '%43', '/' => '%47', ':' => '%3A', '{' => '%7B', '|' => '%7C', '}' => '%7D',
+                  '^' => '%94', '`' => '%96', '&' => '%26', "'" => '%27');
+
 use warnings 'once';
 
 use base 'Class::Accessor';
-__PACKAGE__->mk_accessors(qw(url ua 
+__PACKAGE__->mk_accessors(qw(url ua
                             ));
 
 sub new {
@@ -106,10 +110,10 @@ sub get_current_user
     my($self) = @_;
     if ($self->{token})
     {
-	my $t = P3AuthToken->new(token => $self->{token});
-	my $u = $t->user_id;
-	$u =~ s/\@.*$//;
-	return $self->get_user($u);
+    my $t = P3AuthToken->new(token => $self->{token});
+    my $u = $t->user_id;
+    $u =~ s/\@.*$//;
+    return $self->get_user($u);
     }
     return undef;
 }
@@ -119,17 +123,17 @@ sub get_user
     my($self, $user) = @_;
 
     my $res = $self->ua->get($self->url . "/user/$user",
-			     $self->auth_header);
+                 $self->auth_header);
 
     if (!$res->is_success)
     {
-	die "user retrieve failed with " . $res->code . " " . $res->status_line . " " . $res->content;
+    die "user retrieve failed with " . $res->code . " " . $res->status_line . " " . $res->content;
     }
     my $dat = $res->content;
     my $u = eval { decode_json($dat); };
     if ($@)
     {
-	die "Error parsing result: $@";
+    die "Error parsing result: $@";
     }
     return $u;
 }
@@ -141,7 +145,7 @@ sub get_user
 sub url_encode
 {
     my($self, $q) = @_;
-    $q =~ s/([<>"#\%+\/{}\|\\\^\[\]:`'])/$P3DataAPI::EncodeMap{$1}/gs;
+    $q =~ s/([<>"#\%+\/{}\|\\\^\[\]:`'])/$EncodeMap{$1}/gs;
     return $q;
 }
 
