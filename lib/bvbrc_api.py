@@ -90,6 +90,7 @@ def getSubsystemsDf(genome_ids,limit=2500000):
 
 # Given a set of genome_ids, returns a pandas dataframe after querying for pathways 
 def getPathwayDf(genome_ids,limit=2500000):
+    print(f'executing getPathwayDf with {len(genome_ids)} genome ids') 
     pathway_df_list = [] 
     for gids in chunker(genome_ids, 20):
         batch=""
