@@ -48,8 +48,11 @@ def getFeatureDf(genome_ids, limit=2500000):
         # TODO: set column data types
         feature_df = pd.read_csv(io.StringIO(batch),sep='\t')
         feature_df_list.append(feature_df)
-    return_df = pd.concat(feature_df_list) 
-    return return_df
+    if len(feature_df_list) > 0:
+        return_df = pd.concat(feature_df_list) 
+        return return_df
+    else:
+        return None
 
 # Given a set of genome_ids, returns a pandas dataframe after querying for subsystems
 def getSubsystemsDf(genome_ids,limit=2500000):
@@ -79,8 +82,11 @@ def getSubsystemsDf(genome_ids,limit=2500000):
         # TODO: set column data types
         subsystem_df = pd.read_csv(io.StringIO(batch),sep='\t')
         subsystem_df_list.append(subsystem_df)
-    return_df = pd.concat(subsystem_df_list)
-    return return_df
+    if len(subsystem_df_list) > 0:
+        return_df = pd.concat(subsystem_df_list)
+        return return_df
+    else:
+        return None
 
 # Given a set of genome_ids, returns a pandas dataframe after querying for pathways 
 def getPathwayDf(genome_ids,limit=2500000):
@@ -108,8 +114,11 @@ def getPathwayDf(genome_ids,limit=2500000):
         # TODO: set column data types
         pathway_df = pd.read_csv(io.StringIO(batch),sep='\t')
         pathway_df_list.append(pathway_df)
-    return_df = pd.concat(pathway_df_list)
-    return return_df
+    if len(pathway_df_list) > 0:
+        return_df = pd.concat(pathway_df_list)
+        return return_df
+    else:
+        return None
 
 # athenticates session by searching for token file
 def authenticateByFile(tokenFile=None, Session=None):
