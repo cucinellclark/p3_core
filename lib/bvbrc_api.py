@@ -22,7 +22,7 @@ def chunker(seq, size):
     return (seq[pos:pos + size] for pos in range(0, len(seq), size))
 
 # Given a set of genome_ids, returns a pandas dataframe after querying for features
-def getFeatureDf(genome_ids, limit=2500000):
+def getFeatureDf(genome_ids, session, limit=2500000):
     feature_df_list = []
     for gids in chunker(genome_ids, 20):
         batch=""
@@ -31,7 +31,7 @@ def getFeatureDf(genome_ids, limit=2500000):
         select = "sort(+feature_id)&eq(annotation,PATRIC)"
         base = "https://www.patricbrc.org/api/genome_feature/?http_download=true"
         query = "&".join([genomes,limit,select]) 
-        headers = {"accept":"text/tsv", "content-type":"application/rqlquery+x-www-form-urlencoded"}
+        headers = {"accept":"text/tsv", "content-type":"application/rqlquery+x-www-form-urlencoded", 'Authorization': session.headers['Authorization']}
         #query = requests.get(f"https://www.patricbrc.org/api/genome_feature/?in(genome_id,({','.join(gids)}))&eq(annotation,PATRIC)&limit({limit})&sort(+genome_id)&http_download=true&http_accept=text/tsv")
 
         print('Query = {0}\nHeaders = {1}'.format(base+'&'+query,headers))
@@ -55,7 +55,7 @@ def getFeatureDf(genome_ids, limit=2500000):
         return None
 
 # Given a set of genome_ids, returns a pandas dataframe after querying for subsystems
-def getSubsystemsDf(genome_ids,limit=2500000):
+def getSubsystemsDf(genome_ids,session,limit=2500000):
     subsystem_df_list = []
     for gids in chunker(genome_ids, 20):
         batch=""
@@ -64,7 +64,7 @@ def getSubsystemsDf(genome_ids,limit=2500000):
         select = "sort(+id)"
         base = "https://www.patricbrc.org/api/subsystem/?http_download=true"
         query = "&".join([genomes,limit,select])
-        headers = {"accept":"text/tsv", "content-type":"application/rqlquery+x-www-form-urlencoded"}
+        headers = {"accept":"text/tsv", "content-type":"application/rqlquery+x-www-form-urlencoded", 'Authorization': session.headers['Authorization']}
         #subsystem_query = requests.get(f"https://patricbrc.org/api/subsystem/?in(genome_id,({','.join(gids)}))&limit({limit})&sort(+genome_id)&http_accept=text/tsv")
         #subsystem_df = pd.read_table(io.StringIO(subsystem_query.text),sep='\t')
 
@@ -89,7 +89,7 @@ def getSubsystemsDf(genome_ids,limit=2500000):
         return None
 
 # Given a set of genome_ids, returns a pandas dataframe after querying for pathways 
-def getPathwayDf(genome_ids,limit=2500000):
+def getPathwayDf(genome_ids,session,limit=2500000):
     print(f'executing getPathwayDf with {len(genome_ids)} genome ids') 
     pathway_df_list = [] 
     for gids in chunker(genome_ids, 20):
@@ -99,7 +99,7 @@ def getPathwayDf(genome_ids,limit=2500000):
         select = "eq(annotation,PATRIC)&sort(+id)"
         base = "https://www.patricbrc.org/api/pathway/?http_download=true"
         query = "&".join([genomes,limit_str,select])
-        headers = {"accept":"text/tsv", "content-type":"application/rqlquery+x-www-form-urlencoded"}
+        headers = {"accept":"text/tsv", "content-type":"application/rqlquery+x-www-form-urlencoded", 'Authorization': session.headers['Authorization']}
 
         print('Query = {0}\nHeaders = {1}'.format(base+'&'+query,headers))
         with requests.post(url=base, data=query, headers=headers) as r:
