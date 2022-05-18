@@ -31,8 +31,11 @@ def genome_id_float_to_str(row, genome_ids):
     del ret_row['Genome ID']
     for genome_id in genome_ids: 
         if genome_id in str(row['Genome ID']):
-            ret_row['Genome ID'] = genome_id
-            break
+            if 'Genome ID' in ret_row.columns: # if a genome_id has matched, check their lengths. The longer one is more specific
+                if len(ret_row['Genome ID']) < len(genome_id): 
+                    ret_row['Genome ID'] = genome_id
+            else:
+                ret_row['Genome ID'] = genome_id
     return ret_row
 
 # Given a set of genome_ids, returns a pandas dataframe after querying for features
