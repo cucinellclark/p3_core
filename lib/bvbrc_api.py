@@ -24,16 +24,16 @@ def chunker(seq, size):
 # TODO: may have to make more robust
 # - get*DF queries result in genome_ids as floats
 # - converting these to strings creates some genome_ids with long runs of zeros after the decimal
-# - current implementation: assume a run of '00' after the decimal begins the trailing zeros and get preciding characters
-def genome_id_float_to_str(row):
-    genome_id = row['Genome ID']
-    ret_id = str(genome_id)
-    prefix = ret_id.split('.')[0]
-    suffix = ret_id.split('.')[1]
-    if len(suffix) > 0:
-        suffix = suffix.split('00')[0]
-    row['Genome ID'] = prefix + suffix
-    return row
+# - current implementation: use passed in genome_id list and match the substrings 
+def genome_id_float_to_str(row, genome_ids):
+    ret_id = str(row['Genome ID'])
+    ret_row = row.copy()
+    del ret_row['Genome ID']
+    for genome_id in genome_ids: 
+        if genome_id in str(row['GenomeID']):
+            ret_row['Genome ID'] = genome_id
+            break
+    return ret_row
 
 # Given a set of genome_ids, returns a pandas dataframe after querying for features
 def getFeatureDf(genome_ids, session, limit=2500000):
@@ -65,7 +65,7 @@ def getFeatureDf(genome_ids, session, limit=2500000):
     if len(feature_df_list) > 0:
         return_df = pd.concat(feature_df_list) 
         ### convert data types
-        return_df = return_df.apply(genome_id_float_to_str,axis=1)
+        return_df = return_df.apply(genome_id_float_to_str,axis=1,args=(genome_ids))
         return return_df
     else:
         return None
