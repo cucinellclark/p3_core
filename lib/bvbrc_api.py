@@ -50,6 +50,8 @@ def getFeatureDf(genome_ids, session, limit=2500000):
         feature_df_list.append(feature_df)
     if len(feature_df_list) > 0:
         return_df = pd.concat(feature_df_list) 
+        ### convert data types
+        return_df['Genome ID'] = return_df['Genome ID'].astype(str)
         return return_df
     else:
         return None
