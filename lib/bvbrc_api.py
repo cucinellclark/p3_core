@@ -30,7 +30,7 @@ def genome_id_float_to_str(row, genome_ids):
     ret_row = row.copy()
     del ret_row['Genome ID']
     for genome_id in genome_ids: 
-        if genome_id in str(row['GenomeID']):
+        if genome_id in str(row['Genome ID']):
             ret_row['Genome ID'] = genome_id
             break
     return ret_row
