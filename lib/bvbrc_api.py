@@ -21,6 +21,20 @@ PatricUser = None
 def chunker(seq, size):
     return (seq[pos:pos + size] for pos in range(0, len(seq), size))
 
+# TODO: may have to make more robust
+# - get*DF queries result in genome_ids as floats
+# - converting these to strings creates some genome_ids with long runs of zeros after the decimal
+# - current implementation: assume a run of '00' after the decimal begins the trailing zeros and get preciding characters
+def genome_id_float_to_str(row):
+    genome_id = row['Genome ID']
+    ret_id = str(genome_id)
+    prefix = ret_id.split('.')[0]
+    suffix = ret_id.split('.')[1]
+    if len(suffix) > 0:
+        suffix = suffix.split('00')[0]
+    row['Genome ID'] = prefix + suffix
+    return row
+
 # Given a set of genome_ids, returns a pandas dataframe after querying for features
 def getFeatureDf(genome_ids, session, limit=2500000):
     feature_df_list = []
@@ -51,7 +65,7 @@ def getFeatureDf(genome_ids, session, limit=2500000):
     if len(feature_df_list) > 0:
         return_df = pd.concat(feature_df_list) 
         ### convert data types
-        return_df['Genome ID'] = return_df['Genome ID'].astype(str)
+        return_df = return_df.apply(genome_id_float_to_str,axis=1)
         return return_df
     else:
         return None
