@@ -63,12 +63,12 @@ def getFeatureDf(genome_ids, session, limit=2500000):
                 batch+=line
                 batch_count+=1        
         # TODO: set column data types
-        feature_df = pd.read_csv(io.StringIO(batch),sep='\t')
+        feature_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'Genome ID':str})
         feature_df_list.append(feature_df)
     if len(feature_df_list) > 0:
         return_df = pd.concat(feature_df_list) 
         ### convert data types
-        return_df = return_df.apply(genome_id_float_to_str,axis=1,args=(genome_ids))
+        #return_df = return_df.apply(genome_id_float_to_str,axis=1,args=(genome_ids))
         return return_df
     else:
         return None
