@@ -23,6 +23,7 @@ def chunker(seq, size):
 
 # Given a set of genome_ids, returns a pandas dataframe after querying for features
 def getFeatureDf(genome_ids, session, limit=2500000):
+    dtype_dict = {'Genome ID':str,'PATRIC genus-specific families (PLfams)':'category','PATRIC cross-genus families (PGfams)':'category'}
     feature_df_list = []
     for gids in chunker(genome_ids, 20):
         batch=""
@@ -46,7 +47,7 @@ def getFeatureDf(genome_ids, session, limit=2500000):
                 batch+=line
                 batch_count+=1        
         # TODO: set column data types
-        feature_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'Genome ID':str})
+        feature_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype=dtype_dict)
         feature_df_list.append(feature_df)
     if len(feature_df_list) > 0:
         return_df = pd.concat(feature_df_list) 
