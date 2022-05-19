@@ -1733,7 +1733,7 @@ sub color_regions_by_field
 
 sub compare_regions_for_peg
 {
-    my($self, $peg, $width, $n_genomes, $coloring_method, $genome_filter_str) = @_;
+    my($self, $peg, $width, $n_genomes, $coloring_method, $genome_filter_str, %params) = @_;
 
     $coloring_method = 'pgfam' unless $family_field_of_type{$coloring_method};
     my $coloring_field = $family_field_of_type{$coloring_method};
@@ -1743,6 +1743,7 @@ sub compare_regions_for_peg
     $genome_filter_str //= 'representative';
     my $genome_filter = sub { 1 };
     my $solr_filter;
+    my %gorder;
     if ($genome_filter_str eq 'all')
     {
         print STDERR "$peg all filter\n";
@@ -1766,9 +1767,43 @@ sub compare_regions_for_peg
         $genome_filter = sub { $self->is_reference_genome($_[0]) ne '' };
         $solr_filter = $self->representative_reference_genome_filter(1);
     }
+    elsif ($genome_filter_str eq 'genome_list')
+    {
+	my $genomes = $params{genome_list};
+	ref($genomes) or die "Parameter genome_list missing\n";
+	my %genomes = map { $_ => 1 } @$genomes;
+	$genome_filter = sub { return exists $genomes{$_[0]} };
+	$solr_filter = "{!terms f=genome_id}" . join(",", @$genomes);
+	for my $i (0..$#$genomes)
+	{
+	    $gorder{$genomes->[$i]} = $i;
+	}
+	$gorder{genome_of($peg)} = -1;
+	$n_genomes = @$genomes;
+    }
+    elsif ($genome_filter_str eq 'genome_group')
+    {
+	my $group = $params{genome_group};
+	$group or die "Parameter genome_group missing\n";
+	my $genomes = $self->retrieve_patric_ids_from_genome_group($group);
+	my %genomes = map { $_ => 1 } @$genomes;
+	$genome_filter = sub { return exists $genomes{$_[0]} };
+	$solr_filter = "{!terms f=genome_id}" . join(",", @$genomes);
+	for my $i (0..$#$genomes)
+	{
+	    $gorder{$genomes->[$i]} = $i;
+	}
+	$gorder{genome_of($peg)} = -1;
+	$n_genomes = @$genomes;
+    }
 
     my %seqs;
     my @pin = $self->get_pin($peg, $coloring_method, $n_genomes, $genome_filter, $solr_filter, \%seqs);
+
+    if (%gorder)
+    {
+	@pin = sort { $gorder{$a->{genome_id}} <=> $gorder{$b->{genome_id}} } @pin;
+    }
     print STDERR "got pin size=" . scalar(@pin) . "\n";
     # print STDERR Dumper(\@pin);
     my $half_width = int($width / 2);
@@ -2534,6 +2569,7 @@ sub get_pin_p3
         return ($res->[0]);
     }
 
+    print STDERR "Got fam $fam\n";
     my $pin = $self->members_of_family($fam, $family_type, $solr_filter, $fid, $solr_filter ? $max_size : $max_size * 10);
 
     my $me;
