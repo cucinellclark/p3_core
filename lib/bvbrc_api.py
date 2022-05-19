@@ -21,23 +21,6 @@ PatricUser = None
 def chunker(seq, size):
     return (seq[pos:pos + size] for pos in range(0, len(seq), size))
 
-# TODO: may have to make more robust
-# - get*DF queries result in genome_ids as floats
-# - converting these to strings creates some genome_ids with long runs of zeros after the decimal
-# - current implementation: use passed in genome_id list and match the substrings 
-def genome_id_float_to_str(row, genome_ids):
-    ret_id = str(row['Genome ID'])
-    ret_row = row.copy()
-    del ret_row['Genome ID']
-    for genome_id in genome_ids: 
-        if genome_id in str(row['Genome ID']):
-            if 'Genome ID' in ret_row.keys(): # if a genome_id has matched, check their lengths. The longer one is more specific
-                if len(ret_row['Genome ID']) < len(genome_id): 
-                    ret_row['Genome ID'] = str(genome_id)
-            else:
-                ret_row['Genome ID'] = str(genome_id)
-    return ret_row
-
 # Given a set of genome_ids, returns a pandas dataframe after querying for features
 def getFeatureDf(genome_ids, session, limit=2500000):
     feature_df_list = []
@@ -67,8 +50,6 @@ def getFeatureDf(genome_ids, session, limit=2500000):
         feature_df_list.append(feature_df)
     if len(feature_df_list) > 0:
         return_df = pd.concat(feature_df_list) 
-        ### convert data types
-        #return_df = return_df.apply(genome_id_float_to_str,axis=1,args=(genome_ids))
         return return_df
     else:
         return None
