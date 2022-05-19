@@ -113,7 +113,7 @@ def getPathwayDf(genome_ids,session,limit=2500000):
                 batch+=line
                 batch_count+=1 
         # TODO: set column data types
-        pathway_df = pd.read_csv(io.StringIO(batch),sep='\t')
+        pathway_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'genome_id':str})
         pathway_df_list.append(pathway_df)
     if len(pathway_df_list) > 0:
         return_df = pd.concat(pathway_df_list)
