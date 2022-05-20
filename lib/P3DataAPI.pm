@@ -1733,7 +1733,9 @@ sub color_regions_by_field
 
 sub compare_regions_for_peg
 {
-    my($self, $peg, $width, $n_genomes, $coloring_method, $genome_filter_str, %params) = @_;
+    my($self, $peg, $width, $n_genomes, $coloring_method, $genome_filter_str, $params) = @_;
+
+    print Dumper($peg, $width, $n_genomes, $coloring_method, $genome_filter_str, $params);
 
     $coloring_method = 'pgfam' unless $family_field_of_type{$coloring_method};
     my $coloring_field = $family_field_of_type{$coloring_method};
@@ -1744,6 +1746,7 @@ sub compare_regions_for_peg
     my $genome_filter = sub { 1 };
     my $solr_filter;
     my %gorder;
+    my $features;
     if ($genome_filter_str eq 'all')
     {
         print STDERR "$peg all filter\n";
@@ -1769,7 +1772,7 @@ sub compare_regions_for_peg
     }
     elsif ($genome_filter_str eq 'genome_list')
     {
-	my $genomes = $params{genome_list};
+	my $genomes = $params->{genome_list};
 	ref($genomes) or die "Parameter genome_list missing\n";
 	my %genomes = map { $_ => 1 } @$genomes;
 	$genome_filter = sub { return exists $genomes{$_[0]} };
@@ -1783,7 +1786,7 @@ sub compare_regions_for_peg
     }
     elsif ($genome_filter_str eq 'genome_group')
     {
-	my $group = $params{genome_group};
+	my $group = $params->{genome_group};
 	$group or die "Parameter genome_group missing\n";
 	my $genomes = $self->retrieve_patric_ids_from_genome_group($group);
 	my %genomes = map { $_ => 1 } @$genomes;
@@ -1796,9 +1799,47 @@ sub compare_regions_for_peg
 	$gorder{genome_of($peg)} = -1;
 	$n_genomes = @$genomes;
     }
+    elsif ($genome_filter_str eq 'feature_group')
+    {
+	#
+	# Feature groups are dealt with a little differently, since
+	# they replace the pin choice. We will need to look up the data
+	# that is found for the pin creation and replace the pin with that.
+	#
+	
+	my $group = $params->{feature_group};
+	$group or die "Parameter feature_group missing\n";
+	$features = $self->retrieve_patricids_from_feature_group($group);
+
+	print Dumper(fgroup  => $group, $features);
+
+	#
+	# We remove our focus peg from the features list so it is not duplicated.
+	#
+	@$features = grep { $_ ne $peg } @$features;
+
+	for my $i (0..$#$features)
+	{
+	    $gorder{genome_of($features->[$i])} = $i;
+	}
+	$gorder{genome_of($peg)} = -1;
+	$n_genomes = @$features;
+    }
+
+    # print Dumper($genome_filter, $solr_filter);
 
     my %seqs;
-    my @pin = $self->get_pin($peg, $coloring_method, $n_genomes, $genome_filter, $solr_filter, \%seqs);
+
+    my @pin;
+
+    if ($features)
+    {
+	@pin = $self->get_pin_from_features($peg, $features, \%seqs);
+    }
+    else
+    {
+	@pin = $self->get_pin($peg, $coloring_method, $n_genomes, $genome_filter, $solr_filter, \%seqs);
+    }
 
     if (%gorder)
     {
@@ -2585,7 +2626,18 @@ sub get_pin_p3
             push(@cut_pin, $r);
         }
     }
-    return($me, @cut_pin)
+    return($me, @cut_pin);
+}
+
+sub get_pin_from_features
+{
+    my($self, $peg, $features, $seqs) = @_;
+
+    my($me, @pin) = $self->expand_fids_to_pin([$peg, @$features]);
+    print Dumper(exp => $me, @pin);
+    my ($me, @annotated) = $self->annotate_pin_with_blast($me, \@pin, $peg, scalar @$features, $seqs);
+
+    return ($me, @annotated);
 }
 
 =head3 expand_fids_to_pin
@@ -2720,6 +2772,8 @@ sub get_pin
     my($me, @pin) = $self->get_pin_p3($fid, $family_type, $max_size, $genome_filter, $solr_filter);
     #my($me, @pin) = $self->get_pin_mysql($fid, $family_type, $max_size, $genome_filter);
 
+    
+
     # print "me:$me\n";
     #  print "\t$_->{genome_id}\n" foreach @pin;
 
@@ -2727,8 +2781,18 @@ sub get_pin
     # Only if we have other pegs..
     #
 
-    my @out;
+    my ($me, @annotated) = $self->annotate_pin_with_blast($me, \@pin, $fid, $max_size, $seqs);
+    print Dumper(\@annotated);
 
+    return ($me, @annotated);
+}
+
+sub annotate_pin_with_blast
+{
+    my($self, $me, $pin, $fid, $max_size, $seqs) = @_;
+    my @pin = @$pin;
+
+    my @out;
     if (@pin)
     {
         my %cut_pin = map { $_->{patric_id} => $_ } @pin;
@@ -2789,6 +2853,7 @@ sub get_pin
             push(@hits, [$me->{patric_id}, $_, $iden, $b1, $e1, $b2, $e2])
                 foreach @{$md5_to_id{$id2}};
         }
+
         for my $hit (@hits)
         {
             my($id1, $id2, $iden, $b1, $e1, $b2, $e2) = @$hit;
@@ -2820,7 +2885,7 @@ sub get_pin
     {
 
     }
-    return ($me, @out);
+    return($me, @out);
 }
 
 sub expand_pin_to_regions
