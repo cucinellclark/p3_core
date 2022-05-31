@@ -80,8 +80,8 @@ def getSubsystemsDf(genome_ids,session,limit=2500000):
                 line = line+'\n'
                 batch+=line
                 batch_count+=1
-        # TODO: set column data types
-        subsystem_df = pd.read_csv(io.StringIO(batch),sep='\t')
+        # set column data types
+        subsystem_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'genome_id':str})
         subsystem_df_list.append(subsystem_df)
     if len(subsystem_df_list) > 0:
         return_df = pd.concat(subsystem_df_list)
