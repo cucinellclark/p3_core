@@ -296,7 +296,7 @@ sub query
             $lim = "limit($limitFound,0)";
             $done = 1;
         }
-	my $q   = "$qstr&$lim";
+    my $q   = "$qstr&$lim";
 
         #       print STDERR "Qry $url '$q'\n";
         #	my $resp = $ua->post($url,
@@ -305,7 +305,7 @@ sub query
         my $end;
         # Form url-encoding
         if (! $self->{raw}) {
-	    $q = $self->url_encode($q);
+        $q = $self->url_encode($q);
         }
         $q =~ s/ /+/g;
         # POST query - we retry 5 times after error
@@ -313,7 +313,7 @@ sub query
         # print STDERR $resp->content;
 
         push @result, @$data;
-		     
+
         #        print STDERR scalar(@$data) . " results found.\n";
         my $r = $resp->header('content-range');
 
@@ -355,7 +355,7 @@ sub submit_query {
         print $g_log_fh strftime("%Y-%m-%d %H:%M:%S", localtime $t1) . sprintf(".%03d %.3f", $ms, $elap) . " " . $response->code . " $$ $core " . $response->header("Content-Length") . "\n";
     }
 #        print STDERR Dumper($response);
-        my $error; 
+        my $error;
         if ( $response->is_success ) {
             eval {
                 $data = decode_json($response->content);
@@ -575,10 +575,10 @@ sub solr_query_raw
     if ($res->is_success)
     {
         my $out = decode_json($res->content);
-	if ($self->debug)
-	{
-	    print STDERR " solr qtime $out->{responseHeader}->{QTime}\n";
-	}
+    if ($self->debug)
+    {
+        print STDERR " solr qtime $out->{responseHeader}->{QTime}\n";
+    }
         return $out;
     }
     else
@@ -805,7 +805,7 @@ sub retrieve_contigs_in_genomes_to_temp {
     my ( $self, $genome_ids ) = @_;
 
     my $temp = File::Temp->new();
-    
+
     for my $gid (@$genome_ids) {
         my $gid_fh;
 
@@ -992,14 +992,14 @@ sub retrieve_patricids_from_feature_group {
     $self->query_cb("genome_feature",
                     sub {
                         my ($data) = @_;
-			push @names, grep { $_ } map { $_->{patric_id} } @$data;
+            push @names, grep { $_ } map { $_->{patric_id} } @$data;
                         #for my $ent (@$data) {
-			#push @names, $ent->{patric_id};
+            #push @names, $ent->{patric_id};
                         #}
                         return 1;
                     },
                     [ "in",     "feature_id", "FeatureGroup(" . uri_escape($feature_group_path) . ")"],
-		    ['select', 'patric_id,feature_id']
+            ['select', 'patric_id,feature_id']
                    );
     return \@names
 }
@@ -1022,22 +1022,22 @@ sub retrieve_sequences_from_feature_group {
     $fields //= [];
 
     $type eq 'na' or $type eq 'aa' or die "retrieve_protein_sequences_from_feature_group: Invalid type $type\n";
-    
+
     my $key = "${type}_sequence_md5";
     my %map;
 
     push(@$fields, $key, qw(patric_id feature_id accession annotation));
     my $sel = join(",", @$fields);
-	 
+
 
     $self->query_cb("genome_feature",
                     sub {
                         my ($data) = @_;
-			push(@{$map{$_->{$key}}}, $_) foreach @$data;
+            push(@{$map{$_->{$key}}}, $_) foreach @$data;
                         return 1;
                     },
                     [ "in",     "feature_id", "FeatureGroup(" . uri_escape($feature_group_path) . ")"],
-		    ['select', $sel]
+            ['select', $sel]
                    );
     # print STDERR Dumper(\%map);
     my $seqs = $self->lookup_sequence_data_hash([keys %map]);
@@ -1046,11 +1046,11 @@ sub retrieve_sequences_from_feature_group {
     my @out;
     while (my($k, $v) = each %map)
     {
-	for my $ent (@$v)
-	{
-	    $ent->{sequence} = $seqs->{$k};
-	    push(@out, $ent);
-	}
+    for my $ent (@$v)
+    {
+        $ent->{sequence} = $seqs->{$k};
+        push(@out, $ent);
+    }
     }
     return \@out;
 }
@@ -1195,7 +1195,7 @@ sub retrieve_protein_features_in_genomes_to_temp {
     $ret_list = [] if wantarray;
 
     for my $gid (@$genome_ids) {
-	my %map;
+    my %map;
         $self->query_cb(
             "genome_feature",
             sub {
@@ -1222,7 +1222,7 @@ sub retrieve_protein_features_in_genomes_to_temp {
              [ "eq", "annotation", "PATRIC"],
             [ "eq",     "genome_id",    $gid ],
             [ "select", "patric_id,product,aa_sequence_md5,plfam_id,pgfam_id" ],
-		       );
+               );
     }
     close($temp);
     return wantarray ? ($temp, $ret_list) : $temp;
@@ -1396,7 +1396,7 @@ sub retrieve_protein_features_in_genomes_with_role {
 
                 return 1;
             },
-	    [ "in",     "feature_type", "(mat_peptide,CDS)" ],
+        [ "in",     "feature_type", "(mat_peptide,CDS)" ],
             [ "eq", "annotation",   "PATRIC" ],
             [ "eq", "genome_id",    $gid ],
             [ "eq", "product",      $role ],
@@ -1474,10 +1474,10 @@ sub retrieve_dna_features_in_genomes_to_temp {
     #
     $self->lookup_sequence_data([keys %map], sub {
         my($ent) = @_;
-	for my $id (@{$map{$ent->{md5}}})
-	{
-	    print_alignment_as_fasta($fasta_fh, [$id, undef, $ent->{sequence}]);
-	}
+    for my $id (@{$map{$ent->{md5}}})
+    {
+        print_alignment_as_fasta($fasta_fh, [$id, undef, $ent->{sequence}]);
+    }
     });
 
     return $fasta_fh;
@@ -1502,7 +1502,7 @@ sub retrieve_rna_features_in_genomes_to_temp {
             },
                         [ "eq",     "genome_id", $gid ],
                         [ "eq", "patric_id", "*"],
-			[ "eq", "feature_type", "*rna"],
+            [ "eq", "feature_type", "*rna"],
                         [ "select", "patric_id,na_sequence_md5" ],
         );
     }
@@ -1511,10 +1511,10 @@ sub retrieve_rna_features_in_genomes_to_temp {
     #
     $self->lookup_sequence_data([keys %map], sub {
         my($ent) = @_;
-	for my $id (@{$map{$ent->{md5}}})
-	{
-	    print_alignment_as_fasta($fasta_fh, [$id, undef, $ent->{sequence}]);
-	}
+    for my $id (@{$map{$ent->{md5}}})
+    {
+        print_alignment_as_fasta($fasta_fh, [$id, undef, $ent->{sequence}]);
+    }
     });
 
     return $fasta_fh;
@@ -1772,58 +1772,58 @@ sub compare_regions_for_peg
     }
     elsif ($genome_filter_str eq 'genome_list')
     {
-	my $genomes = $params->{genome_list};
-	ref($genomes) or die "Parameter genome_list missing\n";
-	my %genomes = map { $_ => 1 } @$genomes;
-	$genome_filter = sub { return exists $genomes{$_[0]} };
-	$solr_filter = "{!terms f=genome_id}" . join(",", @$genomes);
-	for my $i (0..$#$genomes)
-	{
-	    $gorder{$genomes->[$i]} = $i;
-	}
-	$gorder{genome_of($peg)} = -1;
-	$n_genomes = @$genomes;
+    my $genomes = $params->{genome_list};
+    ref($genomes) or die "Parameter genome_list missing\n";
+    my %genomes = map { $_ => 1 } @$genomes;
+    $genome_filter = sub { return exists $genomes{$_[0]} };
+    $solr_filter = "{!terms f=genome_id}" . join(",", @$genomes);
+    for my $i (0..$#$genomes)
+    {
+        $gorder{$genomes->[$i]} = $i;
+    }
+    $gorder{genome_of($peg)} = -1;
+    $n_genomes = @$genomes;
     }
     elsif ($genome_filter_str eq 'genome_group')
     {
-	my $group = $params->{genome_group};
-	$group or die "Parameter genome_group missing\n";
-	my $genomes = $self->retrieve_patric_ids_from_genome_group($group);
-	my %genomes = map { $_ => 1 } @$genomes;
-	$genome_filter = sub { return exists $genomes{$_[0]} };
-	$solr_filter = "{!terms f=genome_id}" . join(",", @$genomes);
-	for my $i (0..$#$genomes)
-	{
-	    $gorder{$genomes->[$i]} = $i;
-	}
-	$gorder{genome_of($peg)} = -1;
-	$n_genomes = @$genomes;
+    my $group = $params->{genome_group};
+    $group or die "Parameter genome_group missing\n";
+    my $genomes = $self->retrieve_patric_ids_from_genome_group($group);
+    my %genomes = map { $_ => 1 } @$genomes;
+    $genome_filter = sub { return exists $genomes{$_[0]} };
+    $solr_filter = "{!terms f=genome_id}" . join(",", @$genomes);
+    for my $i (0..$#$genomes)
+    {
+        $gorder{$genomes->[$i]} = $i;
+    }
+    $gorder{genome_of($peg)} = -1;
+    $n_genomes = @$genomes;
     }
     elsif ($genome_filter_str eq 'feature_group')
     {
-	#
-	# Feature groups are dealt with a little differently, since
-	# they replace the pin choice. We will need to look up the data
-	# that is found for the pin creation and replace the pin with that.
-	#
-	
-	my $group = $params->{feature_group};
-	$group or die "Parameter feature_group missing\n";
-	$features = $self->retrieve_patricids_from_feature_group($group);
+    #
+    # Feature groups are dealt with a little differently, since
+    # they replace the pin choice. We will need to look up the data
+    # that is found for the pin creation and replace the pin with that.
+    #
 
-	print Dumper(fgroup  => $group, $features);
+    my $group = $params->{feature_group};
+    $group or die "Parameter feature_group missing\n";
+    $features = $self->retrieve_patricids_from_feature_group($group);
 
-	#
-	# We remove our focus peg from the features list so it is not duplicated.
-	#
-	@$features = grep { $_ ne $peg } @$features;
+    print Dumper(fgroup  => $group, $features);
 
-	for my $i (0..$#$features)
-	{
-	    $gorder{genome_of($features->[$i])} = $i;
-	}
-	$gorder{genome_of($peg)} = -1;
-	$n_genomes = @$features;
+    #
+    # We remove our focus peg from the features list so it is not duplicated.
+    #
+    @$features = grep { $_ ne $peg } @$features;
+
+    for my $i (0..$#$features)
+    {
+        $gorder{genome_of($features->[$i])} = $i;
+    }
+    $gorder{genome_of($peg)} = -1;
+    $n_genomes = @$features;
     }
 
     # print Dumper($genome_filter, $solr_filter);
@@ -1834,16 +1834,16 @@ sub compare_regions_for_peg
 
     if ($features)
     {
-	@pin = $self->get_pin_from_features($peg, $features, \%seqs);
+    @pin = $self->get_pin_from_features($peg, $features, \%seqs);
     }
     else
     {
-	@pin = $self->get_pin($peg, $coloring_method, $n_genomes, $genome_filter, $solr_filter, \%seqs);
+    @pin = $self->get_pin($peg, $coloring_method, $n_genomes, $genome_filter, $solr_filter, \%seqs);
     }
 
     if (%gorder)
     {
-	@pin = sort { $gorder{$a->{genome_id}} <=> $gorder{$b->{genome_id}} } @pin;
+    @pin = sort { $gorder{$a->{genome_id}} <=> $gorder{$b->{genome_id}} } @pin;
     }
     print STDERR "got pin size=" . scalar(@pin) . "\n";
     # print STDERR Dumper(\@pin);
@@ -2635,7 +2635,8 @@ sub get_pin_from_features
 
     my($me, @pin) = $self->expand_fids_to_pin([$peg, @$features]);
     print Dumper(exp => $me, @pin);
-    my ($me, @annotated) = $self->annotate_pin_with_blast($me, \@pin, $peg, scalar @$features, $seqs);
+    my @annotated;
+    ($me, @annotated) = $self->annotate_pin_with_blast($me, \@pin, $peg, scalar @$features, $seqs);
 
     return ($me, @annotated);
 }
@@ -2772,7 +2773,7 @@ sub get_pin
     my($me, @pin) = $self->get_pin_p3($fid, $family_type, $max_size, $genome_filter, $solr_filter);
     #my($me, @pin) = $self->get_pin_mysql($fid, $family_type, $max_size, $genome_filter);
 
-    
+
 
     # print "me:$me\n";
     #  print "\t$_->{genome_id}\n" foreach @pin;
@@ -2780,8 +2781,8 @@ sub get_pin
     #
     # Only if we have other pegs..
     #
-
-    my ($me, @annotated) = $self->annotate_pin_with_blast($me, \@pin, $fid, $max_size, $seqs);
+    my @annotated;
+    ($me, @annotated) = $self->annotate_pin_with_blast($me, \@pin, $fid, $max_size, $seqs);
     print Dumper(\@annotated);
 
     return ($me, @annotated);
@@ -2879,7 +2880,7 @@ sub annotate_pin_with_blast
             push(@out, $match);
         }
         close ($blast);
-	$#out = $max_size - 1 if $max_size && @out > $max_size - 1;
+    $#out = $max_size - 1 if $max_size && @out > $max_size - 1;
     }
     else
     {
@@ -3252,7 +3253,7 @@ sub members_of_family
     push(@q, q => "$fam_field:$fam OR patric_id:$fid");
     if ($solr_filter)
     {
-	push(@q, fq => $solr_filter . "," . genome_of($fid));
+    push(@q, fq => $solr_filter . "," . genome_of($fid));
     }
     push(@q, fl => "patric_id,aa_sequence_md5,accession,start,end,genome_id,genome_name,strand");
 
@@ -3348,8 +3349,8 @@ sub get_taxon_metadata
     my($self, $taxon_id) = @_;
 
     my @t = $self->query("taxonomy",
-			 ["eq", "taxon_id", $taxon_id],
-			 ["select", "genetic_code,taxon_name,lineage_names,lineage_ids,lineage_ranks"]);
+             ["eq", "taxon_id", $taxon_id],
+             ["select", "genetic_code,taxon_name,lineage_names,lineage_ids,lineage_ranks"]);
 
     my $t = $t[0];
     my $lin = $t->{lineage_names};
@@ -3359,18 +3360,18 @@ sub get_taxon_metadata
     my @lineage = ();
     if (ref($lin))
     {
- 	if ($lin->[0] eq 'cellular organisms')
-	{
-	    shift @$lin;
-	    shift @$ids;
-	    shift @$ranks;
-	}
-	# Compute the domain.
-	for my $i (0..$#$lin)
-	{
-	    push @lineage, [$lin->[$i], $ids->[$i], $ranks->[$i]];
-	}
-	$domain = $lin->[0];
+     if ($lin->[0] eq 'cellular organisms')
+    {
+        shift @$lin;
+        shift @$ids;
+        shift @$ranks;
+    }
+    # Compute the domain.
+    for my $i (0..$#$lin)
+    {
+        push @lineage, [$lin->[$i], $ids->[$i], $ranks->[$i]];
+    }
+    $domain = $lin->[0];
     }
 
     # Compute the genetic code.
@@ -3378,11 +3379,11 @@ sub get_taxon_metadata
     my $genetic_code = $t->{genetic_code} // 11;
 
     my $ret = {
-	taxon_id => $taxon_id,
-	taxon_name => $t->{taxon_name},
-	genetic_code => $genetic_code,
-	domain => $domain,
-	taxon_lineage => \@lineage,
+    taxon_id => $taxon_id,
+    taxon_name => $t->{taxon_name},
+    genetic_code => $genetic_code,
+    domain => $domain,
+    taxon_lineage => \@lineage,
     };
     return $ret;
 }
@@ -3688,9 +3689,9 @@ sub representative_reference_genome_filter
     }
     my @list = grep { $cache->{$_} ne '' } keys %$cache;
     return
-	$for_fq
-	? "{!terms f=genome_id}" . join(",", @list)
-	:  "genome_id:(" . join(" OR ", @list) . ")";
+    $for_fq
+    ? "{!terms f=genome_id}" . join(",", @list)
+    :  "genome_id:(" . join(" OR ", @list) . ")";
 }
 
 sub representative_genome_filter
@@ -3704,9 +3705,9 @@ sub representative_genome_filter
     }
     my @list = grep { $cache->{$_}->{reference_genome} eq 'Representative' } keys %$cache;
     return
-	$for_fq
-	? "{!terms f=genome_id}" . join(",", @list)
-	:  "genome_id:(" . join(" OR ", @list) . ")";
+    $for_fq
+    ? "{!terms f=genome_id}" . join(",", @list)
+    :  "genome_id:(" . join(" OR ", @list) . ")";
 }
 
 sub reference_genome_filter
@@ -3720,9 +3721,9 @@ sub reference_genome_filter
     }
     my @list = grep { $cache->{$_}->{reference_genome} eq 'Reference' } keys %$cache;
     return
-	$for_fq
-	? "{!terms f=genome_id}" . join(",", @list)
-	:  "genome_id:(" . join(" OR ", @list) . ")";
+    $for_fq
+    ? "{!terms f=genome_id}" . join(",", @list)
+    :  "genome_id:(" . join(" OR ", @list) . ")";
 
 }
 
