@@ -180,6 +180,7 @@ def getGenomeIdsByGenus(genus, Session, limit=50000):
     #ret_ids = [list(x.values())[0] for x in data]
     #return ret_ids
     base = Base_url + 'genome/?http_download=true'
+    batch=""
     with requests.post(url=base, data=query, headers=Session.headers) as r:
             if r.encoding is None:
                 r.encoding = "utf-8"
