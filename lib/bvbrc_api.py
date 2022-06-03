@@ -182,7 +182,7 @@ def getGenomeDfByGenus(genus, Session, limit=50000):
     #return ret_ids
     base = Base_url + 'genome/?http_download=true'
     batch=""
-    headers = {"accept":"text/tsv", "content-type":"application/rqlquery+x-www-form-urlencoded", 'Authorization': session.headers['Authorization']}
+    headers = {"accept":"text/tsv", "content-type":"application/rqlquery+x-www-form-urlencoded", 'Authorization': Session.headers['Authorization']}
     with requests.post(url=base, data=query, headers=headers) as r:
             if r.encoding is None:
                 r.encoding = "utf-8"
