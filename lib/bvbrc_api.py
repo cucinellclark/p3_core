@@ -194,6 +194,4 @@ def getGenomeDfByGenus(genus, Session, limit=50000):
                 batch+=line
                 batch_count+=1
     genomes_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'genome_id':str})
-    import pdb
-    pdb.set_trace()
-    #data = json.loads(batch)
+    return genomes_df
