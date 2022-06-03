@@ -168,14 +168,12 @@ def getGenomeGroupIds(genomeGroupName, Session, genomeGroupPath=False):
     ret_ids = [list(x.values())[0] for x in data]
     return ret_ids
 
-def getGenusGenomeIds(genus, Session, limit=10000):
+def getGenusGenomeIds(genus, Session, limit=50000):
     #select = f"eq(genus,{genus})&sort(+genome_name)&"
     query = f"eq(genus,{genus})&select(genome_id)"
     query += "&limit({0})".format(limit)
     #base = "https://www.patricbrc.org/api/genome/?http_download=true"
     ret = Session.get(Base_url+'genome/', params=query)
-    import pdb
-    pdb.set_trace()
     data = json.loads(ret.text)
     ret_ids = [list(x.values())[0] for x in data]
     return ret_ids
