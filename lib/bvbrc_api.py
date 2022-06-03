@@ -152,6 +152,7 @@ def authenticateByString(tokenString, Session):
         LOG.write("Patric user = %s\n"%PatricUser)
 
 # Returns a list of genome_ids from the passed in genome group
+# - NOTE: may stop returning after 25,000 genomes. Should there even be that many in a group?
 def getGenomeIdsByGenomeGroup(genomeGroupName, Session, genomeGroupPath=False):
     if genomeGroupPath: #genomeGroupName is assumed to be a full path
         group_path = urllib.parse.quote(genomeGroupName)
@@ -174,7 +175,21 @@ def getGenomeIdsByGenus(genus, Session, limit=50000):
     query = f"eq(genus,{genus})&select(genome_id)"
     query += "&limit({0})".format(limit)
     #base = "https://www.patricbrc.org/api/genome/?http_download=true"
-    ret = Session.get(Base_url+'genome/', params=query)
-    data = json.loads(ret.text)
-    ret_ids = [list(x.values())[0] for x in data]
-    return ret_ids
+    #ret = Session.get(Base_url+'genome/', params=query)
+    #data = json.loads(ret.text)
+    #ret_ids = [list(x.values())[0] for x in data]
+    #return ret_ids
+    base = Base_url + 'genome/?http_download=true'
+    with requests.post(url=base, data=query, headers=Session.headers) as r:
+            if r.encoding is None:
+                r.encoding = "utf-8"
+            if not r.ok:
+                logging.warning("Error in API request \n")
+            batch_count=0
+            for line in r.iter_lines(decode_unicode=True):
+                line = line+'\n'
+                batch+=line
+                batch_count+=1
+    data = json.loads(io.StringIO(batch))
+    import pdb
+    pdb.set_trace()
