@@ -172,7 +172,7 @@ def getGenomeIdsByGenomeGroup(genomeGroupName, Session, genomeGroupPath=False):
 # Returns a list of genome_ids from the passed in genus 
 def getGenomeIdsByGenus(genus, Session, limit=50000):
     #select = f"eq(genus,{genus})&sort(+genome_name)&"
-    query = f"eq(genus,{genus})&select(genome_id)"
+    query = f"eq(genus,{genus})&sort(+genome_id)"
     query += "&limit({0})".format(limit)
     #base = "https://www.patricbrc.org/api/genome/?http_download=true"
     #ret = Session.get(Base_url+'genome/', params=query)
