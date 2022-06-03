@@ -191,6 +191,6 @@ def getGenomeIdsByGenus(genus, Session, limit=50000):
                 line = line+'\n'
                 batch+=line
                 batch_count+=1
-    data = json.loads(io.StringIO(batch))
     import pdb
     pdb.set_trace()
+    data = json.loads(batch)
