@@ -173,7 +173,7 @@ def getGenusGenomeIds(genus, Session, limit=10000):
     query = f"eq(genus,{genus})&selct(genome_id)"
     query += "&limit({0})".format(limit)
     #base = "https://www.patricbrc.org/api/genome/?http_download=true"
-    ret = Session.get(Base_url+'genome/', params=select)
+    ret = Session.get(Base_url+'genome/', params=query)
     data = json.loads(ret.text)
     import pdb
     pdb.set_trace()
