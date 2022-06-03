@@ -170,10 +170,11 @@ def getGenomeIdsByGenomeGroup(genomeGroupName, Session, genomeGroupPath=False):
     return ret_ids
 
 # Returns a list of genome_ids from the passed in genus 
-def getGenomeIdsByGenus(genus, Session, limit=50000):
+def getGenomeDfByGenus(genus, Session, limit=50000):
     #select = f"eq(genus,{genus})&sort(+genome_name)&"
     query = f"eq(genus,{genus})&sort(+genome_id)"
     query += "&limit({0})".format(limit)
+    # commented out section does not return all genome ids
     #base = "https://www.patricbrc.org/api/genome/?http_download=true"
     #ret = Session.get(Base_url+'genome/', params=query)
     #data = json.loads(ret.text)
@@ -181,7 +182,8 @@ def getGenomeIdsByGenus(genus, Session, limit=50000):
     #return ret_ids
     base = Base_url + 'genome/?http_download=true'
     batch=""
-    with requests.post(url=base, data=query, headers=Session.headers) as r:
+    headers = {"accept":"text/tsv", "content-type":"application/rqlquery+x-www-form-urlencoded", 'Authorization': session.headers['Authorization']}
+    with requests.post(url=base, data=query, headers=headers) as r:
             if r.encoding is None:
                 r.encoding = "utf-8"
             if not r.ok:
@@ -191,6 +193,7 @@ def getGenomeIdsByGenus(genus, Session, limit=50000):
                 line = line+'\n'
                 batch+=line
                 batch_count+=1
+    genomes_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'genome_id':str})
     import pdb
     pdb.set_trace()
-    data = json.loads(batch)
+    #data = json.loads(batch)
