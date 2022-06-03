@@ -152,7 +152,7 @@ def authenticateByString(tokenString, Session):
         LOG.write("Patric user = %s\n"%PatricUser)
 
 # Returns a list of genome_ids from the passed in genome group
-def getGenomeGroupIds(genomeGroupName, Session, genomeGroupPath=False):
+def getGenomeIdsByGenomeGroup(genomeGroupName, Session, genomeGroupPath=False):
     if genomeGroupPath: #genomeGroupName is assumed to be a full path
         group_path = urllib.parse.quote(genomeGroupName)
         genomeGroupSpecifier = group_path.replace("/", "%2f")
@@ -168,7 +168,8 @@ def getGenomeGroupIds(genomeGroupName, Session, genomeGroupPath=False):
     ret_ids = [list(x.values())[0] for x in data]
     return ret_ids
 
-def getGenusGenomeIds(genus, Session, limit=50000):
+# Returns a list of genome_ids from the passed in genus 
+def getGenomeIdsByGenus(genus, Session, limit=50000):
     #select = f"eq(genus,{genus})&sort(+genome_name)&"
     query = f"eq(genus,{genus})&select(genome_id)"
     query += "&limit({0})".format(limit)
