@@ -204,6 +204,7 @@ def getDataForGenomes(genomeIdSet, Session):
     base = Base_url + 'genome/?http_download=true'
     batch=""
     headers = {"accept":"text/tsv", "content-type":"application/rqlquery+x-www-form-urlencoded", 'Authorization': Session.headers['Authorization']}
+    print('Query = {0}\nHeaders = {1}'.format(base+'&'+query,headers))
     with requests.post(url=base, data=query, headers=headers) as r:
         if r.encoding is None:
             r.encoding = "utf-8"
