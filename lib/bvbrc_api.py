@@ -195,3 +195,30 @@ def getGenomeDfByGenus(genus, Session, limit=50000):
                 batch_count+=1
     genomes_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'genome_id':str})
     return genomes_df
+
+def getDataForGenomes(genomeIdSet, fieldNames, Session):
+    query = "in(genome_id,(%s))"%",".join(genomeIdSet)
+    if fieldNames:
+        query += "&select(%s)"%",".join(fieldNames)
+    query += "&limit(%s)"%len(genomeIdSet)
+
+    response = Session.get(Base_url+"genome/", params=query)
+    if Debug:
+        LOG.write("getDataForGenomes:\nurl="+response.url+"\nquery="+query+"\n")
+    if not response.ok:
+        LOG.write("Error code %d returned by %s in getDataForGenomes\n"%(response.status_code, response.url))
+        LOG.write("length of query was %d\n"%len(query))
+        LOG.write("url="+req.url+"\nquery="+query+"\n")
+        raise Exception(errorMessage)
+    data = response.text.replace('"','') #get rid of quotes
+    rows = data.split("\n")[:-1] # leave off empty last element
+    retval = []
+    for row in rows:
+        fields = row.split("\t")
+        #if len(fields) != len(fieldNames):
+         #   continue
+        retval.append(fields)
+    import pdb
+    pdb.set_trace()
+    genome_df = pd.concat(retval)
+    return(retval)
