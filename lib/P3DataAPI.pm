@@ -370,8 +370,8 @@ sub submit_query {
             $error = "Failed: " . $response->code . " $content\nquery = $url?$q";
         }
         if ($error) {
-            if ($tries >= 5) {
-                die $error;
+            if ($tries >= 15) {
+                die "Failing after $tries tries: $error";
             } else {
         if ($g_log_fh)
         {
@@ -600,13 +600,13 @@ sub solr_query_raw_list
         $s = gettimeofday;
         print STDERR "SQ: $uri @$params\n";
     }
-    # print STDERR "Query url: $uri\n";
+    # print STDERR "Query url: $uri params: @$params\n";
 
     my $res = $self->ua->post($uri,
                               $params,
-                             "Content-type" => "application/solrquery+x-www-form-urlencoded",
-                             "Accept", "application/solr+json",
-                             $self->auth_header,
+			      "Content-type" => "application/solrquery+x-www-form-urlencoded",
+			      "Accept", "application/solr+json",
+			      $self->auth_header,
                             );
     if ($self->debug)
     {
@@ -741,7 +741,7 @@ sub solr_query
 
 sub solr_query_list
 {
-    my($self, $core, $params, $max_count) = @_;
+    my($self, $core, $params, $max_count, $cb) = @_;
 
     my $start = 0;
     my $block_size = 25000;
@@ -758,7 +758,15 @@ sub solr_query_list
         $n += $ndocs;
 
         # print STDERR "ndocs=$ndocs $n=$n nfound=$resp->{numFound}\n";
-        push(@out, @{$resp->{docs}});
+
+	if (ref($cb))
+	{
+	    push(@out, $cb->($doc));
+	}
+	else
+	{
+	    push(@out, @{$resp->{docs}});
+	}
 
         $start += $ndocs;
         last if (defined($max_count) && $n >= $max_count) || $n >= $resp->{numFound};
