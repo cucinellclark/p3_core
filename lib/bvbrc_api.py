@@ -215,5 +215,6 @@ def getDataForGenomes(genomeIdSet, Session):
             line = line+'\n'
             batch+=line
             batch_count+=1 
-    genomes_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'genome_id':str})
+    # TODO: rename columns
+    genomes_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'Genome ID':str})
     return genomes_df
