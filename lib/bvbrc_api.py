@@ -196,29 +196,25 @@ def getGenomeDfByGenus(genus, Session, limit=50000):
     genomes_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'genome_id':str})
     return genomes_df
 
-def getDataForGenomes(genomeIdSet, fieldNames, Session):
+def getDataForGenomes(genomeIdSet, Session):
+    query = f"sort(+genome_id)"
     query = "in(genome_id,(%s))"%",".join(genomeIdSet)
-    if fieldNames:
-        query += "&select(%s)"%",".join(fieldNames)
     query += "&limit(%s)"%len(genomeIdSet)
 
-    response = Session.get(Base_url+"genome/", params=query)
-    if Debug:
-        LOG.write("getDataForGenomes:\nurl="+response.url+"\nquery="+query+"\n")
-    if not response.ok:
-        LOG.write("Error code %d returned by %s in getDataForGenomes\n"%(response.status_code, response.url))
-        LOG.write("length of query was %d\n"%len(query))
-        LOG.write("url="+req.url+"\nquery="+query+"\n")
-        raise Exception(errorMessage)
-    data = response.text.replace('"','') #get rid of quotes
-    rows = data.split("\n")[:-1] # leave off empty last element
-    retval = []
-    for row in rows:
-        fields = row.split("\t")
-        #if len(fields) != len(fieldNames):
-         #   continue
-        retval.append(fields)
+    base = Base_url + 'genome/?http_download=true'
+    batch=""
+    headers = {"accept":"text/tsv", "content-type":"application/rqlquery+x-www-form-urlencoded", 'Authorization': Session.headers['Authorization']}
+    with requests.post(url=base, data=query, headers=headers) as r:
+        if r.encoding is None:
+            r.encoding = "utf-8"
+        if not r.ok:
+            logging.warning("Error in API request \n")
+        batch_count=0
+        for line in r.iter_lines(decode_unicode=True):
+            line = line+'\n'
+            batch+=line
+            batch_count+=1 
+    genomes_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'genome_id':str})
     import pdb
     pdb.set_trace()
-    genome_df = pd.concat(retval)
-    return(retval)
+    return genomes_df
