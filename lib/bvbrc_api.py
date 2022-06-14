@@ -216,6 +216,4 @@ def getDataForGenomes(genomeIdSet, Session):
             batch+=line
             batch_count+=1 
     genomes_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'genome_id':str})
-    import pdb
-    pdb.set_trace()
     return genomes_df
