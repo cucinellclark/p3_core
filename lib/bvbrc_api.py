@@ -80,8 +80,8 @@ def getSubsystemsDf(genome_ids,session,limit=2500000):
                 line = line+'\n'
                 batch+=line
                 batch_count+=1
-        # TODO: set column data types
-        subsystem_df = pd.read_csv(io.StringIO(batch),sep='\t')
+        # set column data types
+        subsystem_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'genome_id':str})
         subsystem_df_list.append(subsystem_df)
     if len(subsystem_df_list) > 0:
         return_df = pd.concat(subsystem_df_list)
@@ -152,7 +152,8 @@ def authenticateByString(tokenString, Session):
         LOG.write("Patric user = %s\n"%PatricUser)
 
 # Returns a list of genome_ids from the passed in genome group
-def getGenomeGroupIds(genomeGroupName, Session, genomeGroupPath=False):
+# - NOTE: may stop returning after 25,000 genomes. Should there even be that many in a group?
+def getGenomeIdsByGenomeGroup(genomeGroupName, Session, genomeGroupPath=False):
     if genomeGroupPath: #genomeGroupName is assumed to be a full path
         group_path = urllib.parse.quote(genomeGroupName)
         genomeGroupSpecifier = group_path.replace("/", "%2f")
@@ -167,3 +168,53 @@ def getGenomeGroupIds(genomeGroupName, Session, genomeGroupPath=False):
     data = json.loads(ret.text) 
     ret_ids = [list(x.values())[0] for x in data]
     return ret_ids
+
+# Returns a list of genome_ids from the passed in genus 
+def getGenomeDfByGenus(genus, Session, limit=50000):
+    #select = f"eq(genus,{genus})&sort(+genome_name)&"
+    query = f"eq(genus,{genus})&sort(+genome_id)"
+    query += "&limit({0})".format(limit)
+    # commented out section does not return all genome ids
+    #base = "https://www.patricbrc.org/api/genome/?http_download=true"
+    #ret = Session.get(Base_url+'genome/', params=query)
+    #data = json.loads(ret.text)
+    #ret_ids = [list(x.values())[0] for x in data]
+    #return ret_ids
+    base = Base_url + 'genome/?http_download=true'
+    batch=""
+    headers = {"accept":"text/tsv", "content-type":"application/rqlquery+x-www-form-urlencoded", 'Authorization': Session.headers['Authorization']}
+    with requests.post(url=base, data=query, headers=headers) as r:
+            if r.encoding is None:
+                r.encoding = "utf-8"
+            if not r.ok:
+                logging.warning("Error in API request \n")
+            batch_count=0
+            for line in r.iter_lines(decode_unicode=True):
+                line = line+'\n'
+                batch+=line
+                batch_count+=1
+    genomes_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'genome_id':str})
+    return genomes_df
+
+def getDataForGenomes(genomeIdSet, Session):
+    query = "in(genome_id,(%s))"%",".join(genomeIdSet)
+    query += f"sort(+genome_id)"
+    query += "&limit(%s)"%len(genomeIdSet)
+
+    base = Base_url + 'genome/?http_download=true'
+    batch=""
+    headers = {"accept":"text/tsv", "content-type":"application/rqlquery+x-www-form-urlencoded", 'Authorization': Session.headers['Authorization']}
+    print('Query = {0}\nHeaders = {1}'.format(base+'&'+query,headers))
+    with requests.post(url=base, data=query, headers=headers) as r:
+        if r.encoding is None:
+            r.encoding = "utf-8"
+        if not r.ok:
+            logging.warning("Error in API request \n")
+        batch_count=0
+        for line in r.iter_lines(decode_unicode=True):
+            line = line+'\n'
+            batch+=line
+            batch_count+=1 
+    # TODO: rename columns
+    genomes_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'Genome ID':str})
+    return genomes_df
