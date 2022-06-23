@@ -199,7 +199,7 @@ def getGenomeDfByGenus(genus, Session, limit=50000):
 # Returns a list of genome_ids from the passed in genus 
 def getAllGenomesData(Session, limit=50000):
     #select = f"eq(genus,{genus})&sort(+genome_name)&"
-    query = f"sort(+genome_id)"
+    query = f"eq(kingdom,Bacteria)sort(+genome_id)"
     query += "&limit({0})".format(limit)
     # commented out section does not return all genome ids
     #base = "https://www.patricbrc.org/api/genome/?http_download=true"
