@@ -197,7 +197,7 @@ def getGenomeDfByGenus(genus, Session, limit=50000):
     return genomes_df
 
 # Returns a list of genome_ids from the passed in genus 
-def getAllGenomesData(Session, limit=2000000):
+def getGenomeDfBySuperkingdom(Session, limit=2000000):
     #select = f"eq(genus,{genus})&sort(+genome_name)&"
     query = f"eq(superkingdom,Bacteria)sort(+genome_id)"
     query += "&limit({0})".format(limit)
