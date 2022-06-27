@@ -201,7 +201,7 @@ def getGenomeDfByGenus(genus, Session, limit=50000):
 # Returns a list of genome_ids from the passed in genus 
 def getGenomeDfBySuperkingdom(Session, limit=2000000):
     #select = f"eq(genus,{genus})&sort(+genome_name)&"
-    query = f"eq(superkingdom,Bacteria)sort(+genome_id)"
+    query = f"eq(superkingdom,Bacteria)&sort(+genome_id)"
     query += "&limit({0})".format(limit)
     # commented out section does not return all genome ids
     #base = "https://www.patricbrc.org/api/genome/?http_download=true"
@@ -212,6 +212,7 @@ def getGenomeDfBySuperkingdom(Session, limit=2000000):
     base = Base_url + 'genome/?http_download=true'
     batch=""
     headers = {"accept":"text/tsv", "content-type":"application/rqlquery+x-www-form-urlencoded", 'Authorization': Session.headers['Authorization']}
+    print('Query = {0}\nHeaders = {1}'.format(base+'&'+query,headers))
     with requests.post(url=base, data=query, headers=headers) as r:
             if r.encoding is None:
                 r.encoding = "utf-8"
