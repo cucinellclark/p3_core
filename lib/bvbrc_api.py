@@ -118,8 +118,6 @@ def getPathwayDf(genome_ids,session,limit=2500000):
         pathway_df_list.append(pathway_df)
     if len(pathway_df_list) > 0:
         return_df = pd.concat(pathway_df_list)
-        import pdb
-        pdb.set_trace()
         return return_df
     else:
         return None
