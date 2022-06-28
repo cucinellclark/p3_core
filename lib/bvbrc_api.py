@@ -228,7 +228,7 @@ def getGenomeDfBySuperkingdom(Session, limit=2000000):
 
 def getDataForGenomes(genomeIdSet, Session):
     query = "in(genome_id,(%s))"%",".join(genomeIdSet)
-    query += f"sort(+genome_id)"
+    query += f"&sort(+genome_id)"
     query += "&limit(%s)"%len(genomeIdSet)
 
     base = Base_url + 'genome/?http_download=true'
