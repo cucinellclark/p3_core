@@ -227,24 +227,31 @@ def getGenomeDfBySuperkingdom(Session, limit=2000000):
 
 
 def getDataForGenomes(genomeIdSet, Session):
-    query = "in(genome_id,(%s))"%",".join(genomeIdSet)
-    query += f"&sort(+genome_id)"
-    query += "&limit(%s)"%len(genomeIdSet)
+    genome_df_list = []
+    for gids in chunker(genome_ids, 20):
+        query = "in(genome_id,(%s))"%",".join(genomeIdSet)
+        query += f"&sort(+genome_id)"
+        query += "&limit(%s)"%len(genomeIdSet)
 
-    base = Base_url + 'genome/?http_download=true'
-    batch=""
-    headers = {"accept":"text/tsv", "content-type":"application/rqlquery+x-www-form-urlencoded", 'Authorization': Session.headers['Authorization']}
-    print('Query = {0}\nHeaders = {1}'.format(base+'&'+query,headers))
-    with requests.post(url=base, data=query, headers=headers) as r:
-        if r.encoding is None:
-            r.encoding = "utf-8"
-        if not r.ok:
-            logging.warning("Error in API request \n")
-        batch_count=0
-        for line in r.iter_lines(decode_unicode=True):
-            line = line+'\n'
-            batch+=line
-            batch_count+=1 
-    # TODO: rename columns
-    genomes_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'Genome ID':str})
-    return genomes_df
+        base = Base_url + 'genome/?http_download=true'
+        batch=""
+        headers = {"accept":"text/tsv", "content-type":"application/rqlquery+x-www-form-urlencoded", 'Authorization': Session.headers['Authorization']}
+        print('Query = {0}\nHeaders = {1}'.format(base+'&'+query,headers))
+        with requests.post(url=base, data=query, headers=headers) as r:
+            if r.encoding is None:
+                r.encoding = "utf-8"
+            if not r.ok:
+                logging.warning("Error in API request \n")
+            batch_count=0
+            for line in r.iter_lines(decode_unicode=True):
+                line = line+'\n'
+                batch+=line
+                batch_count+=1 
+        # TODO: rename columns
+        genomes_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'Genome ID':str})
+        genome_df_list.append(genomes_df)
+    if len(genome_df_list) > 0:
+        return_df = pd.concat(genome_df_list)
+        return return_df
+    else:
+        None
