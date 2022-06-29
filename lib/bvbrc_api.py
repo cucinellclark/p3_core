@@ -228,7 +228,7 @@ def getGenomeDfBySuperkingdom(Session, limit=2000000):
 
 def getDataForGenomes(genomeIdSet, Session):
     genome_df_list = []
-    for gids in chunker(genome_ids, 20):
+    for gids in chunker(genomeIdSet, 20):
         query = "in(genome_id,(%s))"%",".join(genomeIdSet)
         query += f"&sort(+genome_id)"
         query += "&limit(%s)"%len(genomeIdSet)
