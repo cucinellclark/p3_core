@@ -23,9 +23,9 @@ def chunker(seq, size):
 
 # Given a set of genome_ids, returns an iterator
 # - TODO: incorporate fail cases for each chunk?
-def getQueryData(base, query, session):
-        print('Base = {0}\nQuery = {1}\nHeaders = {2}'.format(base,query,session.headers))
-        with requests.post(url=base, data=query, headers=session.headers) as r:
+def getQueryData(base, query, headers):
+        print('Base = {0}\nQuery = {1}\nHeaders = {2}'.format(base,query,headers))
+        with requests.post(url=base, data=query, headers=headers) as r:
             if r.encoding is None:
                 r.encoding = "utf-8"
             if not r.ok:
