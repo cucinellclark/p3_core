@@ -15,14 +15,36 @@ Base_url = "https://www.patricbrc.org/api/"
 
 PatricUser = None
 
-# First iteration: include getFeatureDf, getSubsystemsDf, getPathwaysDf, authenticate functions and getGenomeGroupIds
+# First iteration: include getFeatureDataFrame, getSubsystemsDataFrame, getPathwaysDataFrame, authenticate functions and getGenomeGroupIds
 
 # splits a list into multiple lists of max size == size
 def chunker(seq, size):
     return (seq[pos:pos + size] for pos in range(0, len(seq), size))
 
+# Given a set of genome_ids, returns an iterator
+# - TODO: incorporate fail cases for each chunk?
+def getFeatureDataStream(genome_ids, session, limit=2500000):
+    for gids in chunker(genome_ids, 20):
+        batch=""
+        genomes = "in(genome_id,({0}))".format(','.join(gids))
+        limit = "limit({0})".format(limit)
+        select = "sort(+feature_id)&eq(annotation,PATRIC)"
+        base = "https://www.patricbrc.org/api/genome_feature/?http_download=true"
+        query = "&".join([genomes,limit,select]) 
+        headers = {"accept":"text/tsv", "content-type":"application/rqlquery+x-www-form-urlencoded", 'Authorization': session.headers['Authorization']}
+        
+        print('Query = {0}\nHeaders = {1}'.format(base+'&'+query,headers))
+        with requests.post(url=base, data=query, headers=headers) as r:
+            if r.encoding is None:
+                r.encoding = "utf-8"
+            if not r.ok:
+                logging.warning("Error in API request \n")
+            batch_count=0
+            for line in r.iter_lines(decode_unicode=True):
+                yield line
+
 # Given a set of genome_ids, returns a pandas dataframe after querying for features
-def getFeatureDf(genome_ids, session, limit=2500000):
+def getFeatureDataFrame(genome_ids, session, limit=2500000):
     dtype_dict = {'Genome ID':str,'PATRIC genus-specific families (PLfams)':'category','PATRIC cross-genus families (PGfams)':'category'}
     feature_df_list = []
     for gids in chunker(genome_ids, 20):
@@ -56,7 +78,7 @@ def getFeatureDf(genome_ids, session, limit=2500000):
         return None
 
 # Given a set of genome_ids, returns a pandas dataframe after querying for subsystems
-def getSubsystemsDf(genome_ids,session,limit=2500000):
+def getSubsystemsDataFrame(genome_ids,session,limit=2500000):
     subsystem_df_list = []
     for gids in chunker(genome_ids, 20):
         batch=""
@@ -90,8 +112,8 @@ def getSubsystemsDf(genome_ids,session,limit=2500000):
         return None
 
 # Given a set of genome_ids, returns a pandas dataframe after querying for pathways 
-def getPathwayDf(genome_ids,session,limit=2500000):
-    print(f'executing getPathwayDf with {len(genome_ids)} genome ids') 
+def getPathwayDataFrame(genome_ids,session,limit=2500000):
+    print(f'executing getPathwayDataFrame with {len(genome_ids)} genome ids') 
     pathway_df_list = [] 
     for gids in chunker(genome_ids, 20):
         batch=""
@@ -170,7 +192,7 @@ def getGenomeIdsByGenomeGroup(genomeGroupName, Session, genomeGroupPath=False):
     return ret_ids
 
 # Returns a list of genome_ids from the passed in genus 
-def getGenomeDfByGenus(genus, Session, limit=50000):
+def getGenomeDataFrameByGenus(genus, Session, limit=50000):
     #select = f"eq(genus,{genus})&sort(+genome_name)&"
     query = f"eq(genus,{genus})&sort(+genome_id)"
     query += "&limit({0})".format(limit)
@@ -197,7 +219,7 @@ def getGenomeDfByGenus(genus, Session, limit=50000):
     return genomes_df
 
 # Returns a list of genome_ids from the passed in genus 
-def getGenomeDfBySuperkingdom(Session, limit=2000000):
+def getGenomeDataFrameBySuperkingdom(Session, limit=2000000):
     #select = f"eq(genus,{genus})&sort(+genome_name)&"
     query = f"eq(superkingdom,Bacteria)&sort(+genome_id)"
     query += "&limit({0})".format(limit)
