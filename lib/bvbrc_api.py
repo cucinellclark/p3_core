@@ -23,23 +23,13 @@ def chunker(seq, size):
 
 # Given a set of genome_ids, returns an iterator
 # - TODO: incorporate fail cases for each chunk?
-def getFeatureDataStream(genome_ids, session, limit=2500000):
-    for gids in chunker(genome_ids, 20):
-        batch=""
-        genomes = "in(genome_id,({0}))".format(','.join(gids))
-        limit = "limit({0})".format(limit)
-        select = "sort(+feature_id)&eq(annotation,PATRIC)"
-        base = "https://www.patricbrc.org/api/genome_feature/?http_download=true"
-        query = "&".join([genomes,limit,select]) 
-        headers = {"accept":"text/tsv", "content-type":"application/rqlquery+x-www-form-urlencoded", 'Authorization': session.headers['Authorization']}
-        
-        print('Query = {0}\nHeaders = {1}'.format(base+'&'+query,headers))
-        with requests.post(url=base, data=query, headers=headers) as r:
+def getQueryData(base, query, session):
+        print('Base = {0}\nQuery = {1}\nHeaders = {2}'.format(base,query,session.headers))
+        with requests.post(url=base, data=query, headers=session.headers) as r:
             if r.encoding is None:
                 r.encoding = "utf-8"
             if not r.ok:
                 logging.warning("Error in API request \n")
-            batch_count=0
             for line in r.iter_lines(decode_unicode=True):
                 yield line
 
