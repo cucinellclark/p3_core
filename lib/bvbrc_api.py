@@ -22,7 +22,6 @@ def chunker(seq, size):
     return (seq[pos:pos + size] for pos in range(0, len(seq), size))
 
 # Given a set of genome_ids, returns an iterator
-# - TODO: incorporate fail cases for each chunk?
 def getQueryData(base, query, headers):
         print('Base = {0}\nQuery = {1}\nHeaders = {2}'.format(base,query,headers))
         with requests.post(url=base, data=query, headers=headers) as r:
@@ -37,10 +36,10 @@ def getQueryData(base, query, headers):
 def getFeatureDataFrame(genome_ids, session, limit=2500000):
     dtype_dict = {'Genome ID':str,'PATRIC genus-specific families (PLfams)':'category','PATRIC cross-genus families (PGfams)':'category'}
     feature_df_list = []
+    limit = "limit({0})".format(limit)
     for gids in chunker(genome_ids, 20):
         batch=""
         genomes = "in(genome_id,({0}))".format(','.join(gids))
-        limit = "limit({0})".format(limit)
         select = "sort(+feature_id)&eq(annotation,PATRIC)"
         base = "https://www.patricbrc.org/api/genome_feature/?http_download=true"
         query = "&".join([genomes,limit,select]) 
@@ -70,10 +69,10 @@ def getFeatureDataFrame(genome_ids, session, limit=2500000):
 # Given a set of genome_ids, returns a pandas dataframe after querying for subsystems
 def getSubsystemsDataFrame(genome_ids,session,limit=2500000):
     subsystem_df_list = []
+    limit = "limit({0})".format(limit)
     for gids in chunker(genome_ids, 20):
         batch=""
         genomes = "in(genome_id,({0}))".format(','.join(gids))
-        limit = "limit({0})".format(limit)
         select = "sort(+id)"
         base = "https://www.patricbrc.org/api/subsystem/?http_download=true"
         query = "&".join([genomes,limit,select])
