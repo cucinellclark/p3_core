@@ -21,7 +21,7 @@ PatricUser = None
 def chunker(seq, size):
     return (seq[pos:pos + size] for pos in range(0, len(seq), size))
 
-# Given a set of genome_ids, returns an iterator
+# Given a query, returns an iterator over each line of the result
 def getQueryData(base, query, headers):
         print('Base = {0}\nQuery = {1}\nHeaders = {2}'.format(base,query,headers))
         with requests.post(url=base, data=query, headers=headers) as r:
