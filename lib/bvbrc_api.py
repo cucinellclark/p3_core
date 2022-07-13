@@ -15,20 +15,31 @@ Base_url = "https://www.patricbrc.org/api/"
 
 PatricUser = None
 
-# First iteration: include getFeatureDf, getSubsystemsDf, getPathwaysDf, authenticate functions and getGenomeGroupIds
+# First iteration: include getFeatureDataFrame, getSubsystemsDataFrame, getPathwaysDataFrame, authenticate functions and getGenomeGroupIds
 
 # splits a list into multiple lists of max size == size
 def chunker(seq, size):
     return (seq[pos:pos + size] for pos in range(0, len(seq), size))
 
+# Given a query, returns an iterator over each line of the result
+def getQueryData(base, query, headers):
+        print('Base = {0}\nQuery = {1}\nHeaders = {2}'.format(base,query,headers))
+        with requests.post(url=base, data=query, headers=headers) as r:
+            if r.encoding is None:
+                r.encoding = "utf-8"
+            if not r.ok:
+                logging.warning("Error in API request \n")
+            for line in r.iter_lines(decode_unicode=True):
+                yield line
+
 # Given a set of genome_ids, returns a pandas dataframe after querying for features
-def getFeatureDf(genome_ids, session, limit=2500000):
+def getFeatureDataFrame(genome_ids, session, limit=2500000):
     dtype_dict = {'Genome ID':str,'PATRIC genus-specific families (PLfams)':'category','PATRIC cross-genus families (PGfams)':'category'}
     feature_df_list = []
+    limit = "limit({0})".format(limit)
     for gids in chunker(genome_ids, 20):
         batch=""
         genomes = "in(genome_id,({0}))".format(','.join(gids))
-        limit = "limit({0})".format(limit)
         select = "sort(+feature_id)&eq(annotation,PATRIC)"
         base = "https://www.patricbrc.org/api/genome_feature/?http_download=true"
         query = "&".join([genomes,limit,select]) 
@@ -56,12 +67,12 @@ def getFeatureDf(genome_ids, session, limit=2500000):
         return None
 
 # Given a set of genome_ids, returns a pandas dataframe after querying for subsystems
-def getSubsystemsDf(genome_ids,session,limit=2500000):
+def getSubsystemsDataFrame(genome_ids,session,limit=2500000):
     subsystem_df_list = []
+    limit = "limit({0})".format(limit)
     for gids in chunker(genome_ids, 20):
         batch=""
         genomes = "in(genome_id,({0}))".format(','.join(gids))
-        limit = "limit({0})".format(limit)
         select = "sort(+id)"
         base = "https://www.patricbrc.org/api/subsystem/?http_download=true"
         query = "&".join([genomes,limit,select])
@@ -90,8 +101,8 @@ def getSubsystemsDf(genome_ids,session,limit=2500000):
         return None
 
 # Given a set of genome_ids, returns a pandas dataframe after querying for pathways 
-def getPathwayDf(genome_ids,session,limit=2500000):
-    print(f'executing getPathwayDf with {len(genome_ids)} genome ids') 
+def getPathwayDataFrame(genome_ids,session,limit=2500000):
+    print(f'executing getPathwayDataFrame with {len(genome_ids)} genome ids') 
     pathway_df_list = [] 
     for gids in chunker(genome_ids, 20):
         batch=""
@@ -114,7 +125,7 @@ def getPathwayDf(genome_ids,session,limit=2500000):
                 batch+=line
                 batch_count+=1 
         # TODO: set column data types
-        pathway_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'genome_id':str})
+        pathway_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'genome_id':str,'pathway_id':str})
         pathway_df_list.append(pathway_df)
     if len(pathway_df_list) > 0:
         return_df = pd.concat(pathway_df_list)
@@ -170,7 +181,7 @@ def getGenomeIdsByGenomeGroup(genomeGroupName, Session, genomeGroupPath=False):
     return ret_ids
 
 # Returns a list of genome_ids from the passed in genus 
-def getGenomeDfByGenus(genus, Session, limit=50000):
+def getGenomeDataFrameByGenus(genus, Session, limit=50000):
     #select = f"eq(genus,{genus})&sort(+genome_name)&"
     query = f"eq(genus,{genus})&sort(+genome_id)"
     query += "&limit({0})".format(limit)
@@ -196,25 +207,62 @@ def getGenomeDfByGenus(genus, Session, limit=50000):
     genomes_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'genome_id':str})
     return genomes_df
 
-def getDataForGenomes(genomeIdSet, Session):
-    query = "in(genome_id,(%s))"%",".join(genomeIdSet)
-    query += f"sort(+genome_id)"
-    query += "&limit(%s)"%len(genomeIdSet)
-
+# Returns a list of genome_ids from the passed in genus 
+def getGenomeDataFrameBySuperkingdom(Session, limit=2000000):
+    #select = f"eq(genus,{genus})&sort(+genome_name)&"
+    query = f"eq(superkingdom,Bacteria)&sort(+genome_id)"
+    query += "&limit({0})".format(limit)
+    # commented out section does not return all genome ids
+    #base = "https://www.patricbrc.org/api/genome/?http_download=true"
+    #ret = Session.get(Base_url+'genome/', params=query)
+    #data = json.loads(ret.text)
+    #ret_ids = [list(x.values())[0] for x in data]
+    #return ret_ids
     base = Base_url + 'genome/?http_download=true'
     batch=""
     headers = {"accept":"text/tsv", "content-type":"application/rqlquery+x-www-form-urlencoded", 'Authorization': Session.headers['Authorization']}
     print('Query = {0}\nHeaders = {1}'.format(base+'&'+query,headers))
     with requests.post(url=base, data=query, headers=headers) as r:
-        if r.encoding is None:
-            r.encoding = "utf-8"
-        if not r.ok:
-            logging.warning("Error in API request \n")
-        batch_count=0
-        for line in r.iter_lines(decode_unicode=True):
-            line = line+'\n'
-            batch+=line
-            batch_count+=1 
-    # TODO: rename columns
-    genomes_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'Genome ID':str})
+            if r.encoding is None:
+                r.encoding = "utf-8"
+            if not r.ok:
+                logging.warning("Error in API request \n")
+            batch_count=0
+            for line in r.iter_lines(decode_unicode=True):
+                line = line+'\n'
+                batch+=line
+                batch_count+=1
+    genomes_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'genome_id':str})
     return genomes_df
+
+
+
+def getDataForGenomes(genomeIdSet, Session):
+    genome_df_list = []
+    for gids in chunker(genomeIdSet, 20):
+        query = "in(genome_id,(%s))"%",".join(genomeIdSet)
+        query += f"&sort(+genome_id)"
+        query += "&limit(%s)"%len(genomeIdSet)
+
+        base = Base_url + 'genome/?http_download=true'
+        batch=""
+        headers = {"accept":"text/tsv", "content-type":"application/rqlquery+x-www-form-urlencoded", 'Authorization': Session.headers['Authorization']}
+        print('Query = {0}\nHeaders = {1}'.format(base+'&'+query,headers))
+        with requests.post(url=base, data=query, headers=headers) as r:
+            if r.encoding is None:
+                r.encoding = "utf-8"
+            if not r.ok:
+                logging.warning("Error in API request \n")
+            batch_count=0
+            for line in r.iter_lines(decode_unicode=True):
+                line = line+'\n'
+                batch+=line
+                batch_count+=1 
+        # TODO: rename columns
+        genomes_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'Genome ID':str})
+        genome_df_list.append(genomes_df)
+    if len(genome_df_list) > 0:
+        return_df = pd.concat(genome_df_list)
+        return return_df
+    else:
+        None
