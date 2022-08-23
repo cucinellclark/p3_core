@@ -1088,6 +1088,9 @@ A list of options such as are expected by L<Getopt::Long::Descriptive>.
 Returns the options object. Every command-line option's value may be retrieved using a method
 on this object.
 
+If invoked in array context, returns the options object, usage object pair so that
+the calling code may emit detailed usage messages if needed.
+
 =back
 
 =cut
@@ -1105,7 +1108,7 @@ sub script_opts {
         print $usage->text;
         exit;
     }
-    return $retVal;
+    return wantarray ? ($retVal, $usage) : $retVal;
 }
 
 =head3 print_cols
