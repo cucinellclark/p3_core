@@ -1710,7 +1710,7 @@ sub _process_entries {
     # Are we counting?
     if (! $cols) {
         # Yes. Pop on the count.
-        push @$retList, [@$row, scalar(@$entries)];
+        push @$retList, [@$row, scalar grep { $_->{$id} } @$entries];
     } else {
         # No. Generate the data. First we need the related-field hash.
         my $relatedH = RELATED->{$object};
