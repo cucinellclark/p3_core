@@ -15,7 +15,7 @@ Base_url = "https://www.patricbrc.org/api/"
 
 PatricUser = None
 
-# First iteration: include getFeatureDataFrame, getSubsystemsDataFrame, getPathwaysDataFrame, authenticate functions and getGenomeGroupIds
+# First iteration: include getFeatureDataFrame, getSubsystemsDataFrame, getPathwayDataFrame, authenticate functions and getGenomeGroupIds
 
 # splits a list into multiple lists of max size == size
 def chunker(seq, size):
@@ -92,6 +92,8 @@ def getSubsystemsDataFrame(genome_ids,session,limit=2500000):
                 batch+=line
                 batch_count+=1
         # set column data types
+        import pdb
+        pdb.set_trace()
         subsystem_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'genome_id':str})
         subsystem_df_list.append(subsystem_df)
     if len(subsystem_df_list) > 0:
