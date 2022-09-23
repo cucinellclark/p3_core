@@ -11,7 +11,7 @@ requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 Debug = False #shared across functions defined here
 LOG = sys.stderr
-Base_url = "https://www.patricbrc.org/api/"
+Base_url = "https://alpha.bv-brc.org/api/"
 
 PatricUser = None
 
@@ -41,10 +41,10 @@ def getFeatureDataFrame(genome_ids, session, limit=2500000):
         batch=""
         genomes = "in(genome_id,({0}))".format(','.join(gids))
         select = "sort(+feature_id)&eq(annotation,PATRIC)"
-        base = "https://www.patricbrc.org/api/genome_feature/?http_download=true"
+        base = "https://alpha.bv-brc.org/api/genome_feature/?http_download=true"
         query = "&".join([genomes,limit,select]) 
         headers = {"accept":"text/tsv", "content-type":"application/rqlquery+x-www-form-urlencoded", 'Authorization': session.headers['Authorization']}
-        #query = requests.get(f"https://www.patricbrc.org/api/genome_feature/?in(genome_id,({','.join(gids)}))&eq(annotation,PATRIC)&limit({limit})&sort(+genome_id)&http_download=true&http_accept=text/tsv")
+        #query = requests.get(f"https://alpha.bv-brc.org/api/genome_feature/?in(genome_id,({','.join(gids)}))&eq(annotation,PATRIC)&limit({limit})&sort(+genome_id)&http_download=true&http_accept=text/tsv")
 
         print('Query = {0}\nHeaders = {1}'.format(base+'&'+query,headers))
         with requests.post(url=base, data=query, headers=headers) as r:
@@ -76,7 +76,7 @@ def getSubsystemsDataFrame(genome_ids,session,limit=2500000):
         batch=""
         genomes = "in(genome_id,({0}))".format(','.join(gids))
         select = "sort(+id)"
-        base = "https://www.patricbrc.org/api/subsystem/?http_download=true"
+        base = "https://alpha.bv-brc.org/api/subsystem/?http_download=true"
         query = "&".join([genomes,limit,select])
         headers = {"accept":"text/tsv", "content-type":"application/rqlquery+x-www-form-urlencoded", 'Authorization': session.headers['Authorization']}
         #subsystem_query = requests.get(f"https://patricbrc.org/api/subsystem/?in(genome_id,({','.join(gids)}))&limit({limit})&sort(+genome_id)&http_accept=text/tsv")
@@ -113,7 +113,7 @@ def getPathwayDataFrame(genome_ids,session,limit=2500000):
         genomes = "in(genome_id,({0}))".format(','.join(gids))
         limit_str = "limit({0})".format(limit)
         select = "eq(annotation,PATRIC)&sort(+id)"
-        base = "https://www.patricbrc.org/api/pathway/?http_download=true"
+        base = "https://alpha.bv-brc.org/api/pathway/?http_download=true"
         query = "&".join([genomes,limit_str,select])
         headers = {"accept":"text/tsv", "content-type":"application/rqlquery+x-www-form-urlencoded", 'Authorization': session.headers['Authorization']}
 
@@ -192,7 +192,7 @@ def getGenomeDataFrameByGenus(genus, Session, limit=50000):
     query = f"eq(genus,{genus})&sort(+genome_id)"
     query += "&limit({0})".format(limit)
     # commented out section does not return all genome ids
-    #base = "https://www.patricbrc.org/api/genome/?http_download=true"
+    #base = "https://alpha.bv-brc.org/api/genome/?http_download=true"
     #ret = Session.get(Base_url+'genome/', params=query)
     #data = json.loads(ret.text)
     #ret_ids = [list(x.values())[0] for x in data]
@@ -221,7 +221,7 @@ def getGenomeDataFrameBySuperkingdom(Session, limit=2000000):
     query = f"eq(superkingdom,Bacteria)&sort(+genome_id)"
     query += "&limit({0})".format(limit)
     # commented out section does not return all genome ids
-    #base = "https://www.patricbrc.org/api/genome/?http_download=true"
+    #base = "https://alpha.bv-brc.org/api/genome/?http_download=true"
     #ret = Session.get(Base_url+'genome/', params=query)
     #data = json.loads(ret.text)
     #ret_ids = [list(x.values())[0] for x in data]
