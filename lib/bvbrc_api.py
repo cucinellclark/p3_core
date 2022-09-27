@@ -32,6 +32,18 @@ def getQueryData(base, query, headers):
             for line in r.iter_lines(decode_unicode=True):
                 yield line
 
+# Given a query, returns all the response text 
+def getQueryDataText(base, query, headers):
+        print('Base = {0}\nQuery = {1}\nHeaders = {2}'.format(base,query,headers))
+        with requests.post(url=base, data=query, headers=headers) as r:
+            if r.encoding is None:
+                r.encoding = "utf-8"
+            if not r.ok:
+                logging.warning("Error in API request \n")
+            #for line in r.iter_lines(decode_unicode=True):
+            #    yield line
+            return r.text
+
 # Given a set of genome_ids, returns a pandas dataframe after querying for features
 def getFeatureDataFrame(genome_ids, session, limit=2500000):
     dtype_dict = {'Genome ID':str,'PATRIC genus-specific families (PLfams)':'category','PATRIC cross-genus families (PGfams)':'category'}
