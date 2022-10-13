@@ -348,7 +348,7 @@ sub raw_query
 
     my @result;
     while ( !$done ) {
-	my $q   = join("&", @query, "limit($chunk,$start)");
+	my $q   = join("&", "limit($chunk,$start)", @query);
 
         #       print STDERR "Qry $url '$q'\n";
         #	my $resp = $ua->post($url,
@@ -1898,7 +1898,7 @@ sub compare_regions_for_peg
 	print STDERR "Q before: $query\n";
 #	$query = uri_unescape($query);
 	print STDERR "Q after: $query\n";
-	$query or die "Parameter feature_query missing\n";
+#	$query or die "Parameter feature_query missing\n";
 	eval {
 	    local $self->{raw} = 1;
 	    $features = [map { $_->{patric_id} } $self->raw_query('genome_feature', $query, 'select(patric_id)')];
