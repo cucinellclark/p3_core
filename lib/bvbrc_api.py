@@ -15,7 +15,7 @@ Base_url = "https://www.patricbrc.org/api/"
 
 PatricUser = None
 
-# First iteration: include getFeatureDataFrame, getSubsystemsDataFrame, getPathwaysDataFrame, authenticate functions and getGenomeGroupIds
+# First iteration: include getFeatureDataFrame, getSubsystemsDataFrame, getPathwayDataFrame, authenticate functions and getGenomeGroupIds
 
 # splits a list into multiple lists of max size == size
 def chunker(seq, size):
@@ -31,6 +31,18 @@ def getQueryData(base, query, headers):
                 logging.warning("Error in API request \n")
             for line in r.iter_lines(decode_unicode=True):
                 yield line
+
+# Given a query, returns all the response text 
+def getQueryDataText(base, query, headers):
+        print('Base = {0}\nQuery = {1}\nHeaders = {2}'.format(base,query,headers))
+        with requests.post(url=base, data=query, headers=headers) as r:
+            if r.encoding is None:
+                r.encoding = "utf-8"
+            if not r.ok:
+                logging.warning("Error in API request \n")
+            #for line in r.iter_lines(decode_unicode=True):
+            #    yield line
+            return r.text
 
 # Given a set of genome_ids, returns a pandas dataframe after querying for features
 def getFeatureDataFrame(genome_ids, session, limit=2500000):
@@ -58,6 +70,8 @@ def getFeatureDataFrame(genome_ids, session, limit=2500000):
                 batch+=line
                 batch_count+=1        
         # TODO: set column data types
+        if batch == '':
+            continue
         feature_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype=dtype_dict)
         feature_df_list.append(feature_df)
     if len(feature_df_list) > 0:
@@ -92,6 +106,8 @@ def getSubsystemsDataFrame(genome_ids,session,limit=2500000):
                 batch+=line
                 batch_count+=1
         # set column data types
+        if batch == '':
+            continue
         subsystem_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'genome_id':str})
         subsystem_df_list.append(subsystem_df)
     if len(subsystem_df_list) > 0:
@@ -125,6 +141,8 @@ def getPathwayDataFrame(genome_ids,session,limit=2500000):
                 batch+=line
                 batch_count+=1 
         # TODO: set column data types
+        if batch == '':
+            continue
         pathway_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'genome_id':str,'pathway_id':str})
         pathway_df_list.append(pathway_df)
     if len(pathway_df_list) > 0:
@@ -204,6 +222,8 @@ def getGenomeDataFrameByGenus(genus, Session, limit=50000):
                 line = line+'\n'
                 batch+=line
                 batch_count+=1
+    if batch == '':
+        return None 
     genomes_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'genome_id':str})
     return genomes_df
 
@@ -232,6 +252,8 @@ def getGenomeDataFrameBySuperkingdom(Session, limit=2000000):
                 line = line+'\n'
                 batch+=line
                 batch_count+=1
+    if batch == '':
+        return None 
     genomes_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'genome_id':str})
     return genomes_df
 
@@ -259,6 +281,8 @@ def getDataForGenomes(genomeIdSet, Session):
                 batch+=line
                 batch_count+=1 
         # TODO: rename columns
+        if batch == '':
+            continue 
         genomes_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'Genome ID':str})
         genome_df_list.append(genomes_df)
     if len(genome_df_list) > 0:
