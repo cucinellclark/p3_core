@@ -1901,7 +1901,7 @@ sub compare_regions_for_peg
 #	$query or die "Parameter feature_query missing\n";
 	eval {
 	    local $self->{raw} = 1;
-	    $features = [map { $_->{patric_id} } $self->raw_query('genome_feature', $query, 'select(patric_id)')];
+	    $features = [map { $_->{patric_id} } $self->raw_query('genome_feature', $query, 'select(patric_id)', 'eq(patric_id,*)')];
 	};
 	if ($@)
 	{
