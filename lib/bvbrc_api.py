@@ -33,8 +33,9 @@ def getQueryData(base, query, headers):
                 yield line
 
 # Given a query, returns all the response text 
-def getQueryDataText(base, query, headers):
-        print('Base = {0}\nQuery = {1}\nHeaders = {2}'.format(base,query,headers))
+def getQueryDataText(base, query, headers, print_query = True):
+        if print_query:
+            print('Base = {0}\nQuery = {1}\nHeaders = {2}'.format(base,query,headers))
         with requests.post(url=base, data=query, headers=headers) as r:
             if r.encoding is None:
                 r.encoding = "utf-8"
