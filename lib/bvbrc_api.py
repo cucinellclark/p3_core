@@ -28,7 +28,9 @@ def getQueryData(base, query, headers):
             if r.encoding is None:
                 r.encoding = "utf-8"
             if not r.ok:
-                logging.warning("Error in API request \n")
+                print (r.reason)
+                sys.stderr.write("Error in API request \n")
+                return None
             for line in r.iter_lines(decode_unicode=True):
                 yield line
 
@@ -40,7 +42,7 @@ def getQueryDataText(base, query, headers, print_query = True):
             if r.encoding is None:
                 r.encoding = "utf-8"
             if not r.ok:
-                logging.warning("Error in API request \n")
+                sys.stderr.write("Error in API request \n")
             #for line in r.iter_lines(decode_unicode=True):
             #    yield line
             return r.text
@@ -64,7 +66,7 @@ def getFeatureDataFrame(genome_ids, session, limit=2500000):
             if r.encoding is None:
                 r.encoding = "utf-8"
             if not r.ok:
-                logging.warning("Error in API request \n")
+                sys.stderr.write("Error in API request \n")
             batch_count=0
             for line in r.iter_lines(decode_unicode=True):
                 line = line+'\n'
@@ -100,7 +102,7 @@ def getSubsystemsDataFrame(genome_ids,session,limit=2500000):
             if r.encoding is None:
                 r.encoding = "utf-8"
             if not r.ok:
-                logging.warning("Error in API request \n")
+                sys.stderr.write("Error in API request \n")
             batch_count=0
             for line in r.iter_lines(decode_unicode=True):
                 line = line+'\n'
@@ -135,7 +137,7 @@ def getPathwayDataFrame(genome_ids,session,limit=2500000):
             if r.encoding is None:
                 r.encoding = "utf-8"
             if not r.ok:
-                logging.warning("Error in API request \n")
+                sys.stderr.write("Error in API request \n")
             batch_count=0
             for line in r.iter_lines(decode_unicode=True):
                 line = line+'\n'
@@ -217,7 +219,7 @@ def getGenomeDataFrameByGenus(genus, Session, limit=50000):
             if r.encoding is None:
                 r.encoding = "utf-8"
             if not r.ok:
-                logging.warning("Error in API request \n")
+                sys.stderr.write("Error in API request \n")
             batch_count=0
             for line in r.iter_lines(decode_unicode=True):
                 line = line+'\n'
@@ -247,7 +249,7 @@ def getGenomeDataFrameBySuperkingdom(Session, limit=2000000):
             if r.encoding is None:
                 r.encoding = "utf-8"
             if not r.ok:
-                logging.warning("Error in API request \n")
+                sys.stderr.write("Error in API request \n")
             batch_count=0
             for line in r.iter_lines(decode_unicode=True):
                 line = line+'\n'
@@ -275,7 +277,7 @@ def getDataForGenomes(genomeIdSet, Session):
             if r.encoding is None:
                 r.encoding = "utf-8"
             if not r.ok:
-                logging.warning("Error in API request \n")
+                sys.stderr.write("Error in API request \n")
             batch_count=0
             for line in r.iter_lines(decode_unicode=True):
                 line = line+'\n'
