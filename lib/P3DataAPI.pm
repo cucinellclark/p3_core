@@ -1898,7 +1898,11 @@ sub compare_regions_for_peg
 	print STDERR "Q before: $query\n";
 #	$query = uri_unescape($query);
 	print STDERR "Q after: $query\n";
-#	$query or die "Parameter feature_query missing\n";
+	#	$query or die "Parameter feature_query missing\n";
+	if ($query eq '')
+	{
+	    die "Feature query was given an empty query; this is not allowed.";
+	}
 	eval {
 	    local $self->{raw} = 1;
 	    $features = [map { $_->{patric_id} } $self->raw_query('genome_feature', $query, 'select(patric_id)', 'eq(patric_id,*)')];
