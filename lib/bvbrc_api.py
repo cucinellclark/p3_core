@@ -28,7 +28,9 @@ def getQueryData(base, query, headers):
             if r.encoding is None:
                 r.encoding = "utf-8"
             if not r.ok:
-                logging.warning("Error in API request \n")
+                print (r.reason)
+                sys.stderr.write("Error in API request \n")
+                return None
             for line in r.iter_lines(decode_unicode=True):
                 yield line
 
@@ -40,7 +42,8 @@ def getQueryDataText(base, query, headers, print_query = True):
             if r.encoding is None:
                 r.encoding = "utf-8"
             if not r.ok:
-                logging.warning("Error in API request \n")
+                sys.stderr.write("Error in API request \n")
+                return None
             #for line in r.iter_lines(decode_unicode=True):
             #    yield line
             return r.text
@@ -64,7 +67,7 @@ def getFeatureDataFrame(genome_ids, session, limit=2500000):
             if r.encoding is None:
                 r.encoding = "utf-8"
             if not r.ok:
-                logging.warning("Error in API request \n")
+                sys.stderr.write("Error in API request \n")
             batch_count=0
             for line in r.iter_lines(decode_unicode=True):
                 line = line+'\n'
@@ -89,7 +92,7 @@ def getSubsystemsDataFrame(genome_ids,session,limit=2500000):
         batch=""
         genomes = "in(genome_id,({0}))".format(','.join(gids))
         select = "sort(+id)"
-        base = "https://www.patricbrc.org/api/subsystem/?http_download=true"
+        base = "https://alpha.bv-brc.org/api/subsystem/?http_download=true"
         query = "&".join([genomes,limit,select])
         headers = {"accept":"text/tsv", "content-type":"application/rqlquery+x-www-form-urlencoded", 'Authorization': session.headers['Authorization']}
         #subsystem_query = requests.get(f"https://patricbrc.org/api/subsystem/?in(genome_id,({','.join(gids)}))&limit({limit})&sort(+genome_id)&http_accept=text/tsv")
@@ -100,7 +103,7 @@ def getSubsystemsDataFrame(genome_ids,session,limit=2500000):
             if r.encoding is None:
                 r.encoding = "utf-8"
             if not r.ok:
-                logging.warning("Error in API request \n")
+                sys.stderr.write("Error in API request \n")
             batch_count=0
             for line in r.iter_lines(decode_unicode=True):
                 line = line+'\n'
@@ -126,7 +129,7 @@ def getPathwayDataFrame(genome_ids,session,limit=2500000):
         genomes = "in(genome_id,({0}))".format(','.join(gids))
         limit_str = "limit({0})".format(limit)
         select = "eq(annotation,PATRIC)&sort(+id)"
-        base = "https://www.patricbrc.org/api/pathway/?http_download=true"
+        base = "https://alpha.bv-brc.org/api/pathway/?http_download=true"
         query = "&".join([genomes,limit_str,select])
         headers = {"accept":"text/tsv", "content-type":"application/rqlquery+x-www-form-urlencoded", 'Authorization': session.headers['Authorization']}
 
@@ -135,7 +138,7 @@ def getPathwayDataFrame(genome_ids,session,limit=2500000):
             if r.encoding is None:
                 r.encoding = "utf-8"
             if not r.ok:
-                logging.warning("Error in API request \n")
+                sys.stderr.write("Error in API request \n")
             batch_count=0
             for line in r.iter_lines(decode_unicode=True):
                 line = line+'\n'
@@ -217,7 +220,7 @@ def getGenomeDataFrameByGenus(genus, Session, limit=50000):
             if r.encoding is None:
                 r.encoding = "utf-8"
             if not r.ok:
-                logging.warning("Error in API request \n")
+                sys.stderr.write("Error in API request \n")
             batch_count=0
             for line in r.iter_lines(decode_unicode=True):
                 line = line+'\n'
@@ -247,7 +250,7 @@ def getGenomeDataFrameBySuperkingdom(Session, limit=2000000):
             if r.encoding is None:
                 r.encoding = "utf-8"
             if not r.ok:
-                logging.warning("Error in API request \n")
+                sys.stderr.write("Error in API request \n")
             batch_count=0
             for line in r.iter_lines(decode_unicode=True):
                 line = line+'\n'
@@ -275,7 +278,7 @@ def getDataForGenomes(genomeIdSet, Session):
             if r.encoding is None:
                 r.encoding = "utf-8"
             if not r.ok:
-                logging.warning("Error in API request \n")
+                sys.stderr.write("Error in API request \n")
             batch_count=0
             for line in r.iter_lines(decode_unicode=True):
                 line = line+'\n'
