@@ -676,7 +676,7 @@ sub form_filter {
         # Clean the values.
         @values = map { clean_value($_) } @values;
         # Apply the constraint.
-        push @retVal, ['in', $field, '(', join(',', @values) . ')'];
+        push @retVal, ['in', $field, '(' . join(',', @values) . ')'];
     }
     # Get the requirement constraints.
     my $reqList = $opt->required // [];
