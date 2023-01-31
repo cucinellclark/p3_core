@@ -1242,6 +1242,60 @@ sub retrieve_protein_features_in_genome_in_export_format {
                    );
 }
 
+
+
+=head3 B<retrieve_features_in_feature_group_in_export_format>
+
+Retrieve the features in the given feature group and write in export format
+to the provided filehandle.
+
+C<$feature_type> is either "aa" or "dna"
+
+=cut
+
+sub retrieve_features_in_feature_group_in_export_format
+{
+    my ( $self, $feature_group_path, $feature_type, $fasta_fh ) = @_;
+
+    my $md5_type;
+    if (lc($feature_type) eq 'aa') {
+	$md5_type = 'aa_sequence_md5';
+    } elsif (lc($feature_type) eq 'dna' || lc($feature_type) eq 'na') {
+	$md5_type = 'na_sequence_md5';
+    } else {
+	die "retrieve_features_in_feature_group_in_export_format: Invalid feature type '$feature_type'\n";
+    }
+
+    my $on_feature =  sub {
+        my ($data) = @_;
+
+        my %by_md5;
+
+        $self->lookup_sequence_data([map { $_->{$md5_type} } @$data ], sub {
+            my $ent = shift;
+            $by_md5{$ent->{md5}} = $ent;
+        });
+
+        for my $ent (@$data) {
+            my $def = "  $ent->{product} [$ent->{genome_name} | $ent->{genome_id}]";
+            print_alignment_as_fasta($fasta_fh,
+                                     [
+                                      $ent->{patric_id},
+                                      $def,
+                                      $by_md5{$ent->{$md5_type}}->{sequence}
+                                      ]
+                                    );
+        }
+        return 1;
+    };
+
+    $self->query_cb("genome_feature",
+                    $on_feature,
+		    [ "in",     "feature_id", "FeatureGroup(" . uri_escape($feature_group_path) . ")"],
+                    [ "select", "patric_id,$md5_type,genome_name,product,genome_id" ],
+                   );
+}
+
 #
 # Side effect, returns list of features and family/function data.
 #
