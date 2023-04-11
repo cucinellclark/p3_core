@@ -2604,8 +2604,7 @@ sub genes_in_region_bulk
 	#
 
 	my @fq = (
-		  #qq(sequence_id:"$contig" OR accession:"$contig"),
-		  "sequence_id:$contig",
+		  "sequence_id:$contig OR accession:$contig",
 		  "annotation:PATRIC",
 		  "NOT feature_type:source");
 
@@ -2633,7 +2632,7 @@ sub genes_in_region_bulk
 			[
 			 [q => "genome_id:$genome"],
 			 (map { [fq => $_] } @fq ),
-			 [fl => 'start,end,feature_id,product,figfam_id,strand,patric_id,pgfam_id,plfam_id,aa_sequence_md5,genome_name,feature_type,accession,sequence_id'],
+			 [fl => 'start,end,feature_id,product,figfam_id,strand,patric_id,pgfam_id,plfam_id,aa_sequence_md5,genome_name,feature_type'],
 			 ]]);
     }
 
