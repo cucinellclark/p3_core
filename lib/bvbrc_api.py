@@ -15,6 +15,8 @@ Base_url = "https://www.patricbrc.org/api/"
 
 PatricUser = None
 
+
+
 # First iteration: include getFeatureDataFrame, getSubsystemsDataFrame, getPathwayDataFrame, authenticate functions and getGenomeGroupIds
 
 # splits a list into multiple lists of max size == size
