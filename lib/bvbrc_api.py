@@ -94,7 +94,7 @@ def getSubsystemsDataFrame(genome_ids,session,limit=2500000):
         batch=""
         genomes = "in(genome_id,({0}))".format(','.join(gids))
         select = "sort(+id)"
-        base = "https://alpha.bv-brc.org/api/subsystem/?http_download=true"
+        base = "https://www.bv-brc.org/api/subsystem/?http_download=true"
         query = "&".join([genomes,limit,select])
         headers = {"accept":"text/tsv", "content-type":"application/rqlquery+x-www-form-urlencoded", 'Authorization': session.headers['Authorization']}
         #subsystem_query = requests.get(f"https://patricbrc.org/api/subsystem/?in(genome_id,({','.join(gids)}))&limit({limit})&sort(+genome_id)&http_accept=text/tsv")
@@ -131,7 +131,7 @@ def getPathwayDataFrame(genome_ids,session,limit=2500000):
         genomes = "in(genome_id,({0}))".format(','.join(gids))
         limit_str = "limit({0})".format(limit)
         select = "eq(annotation,PATRIC)&sort(+id)"
-        base = "https://alpha.bv-brc.org/api/pathway/?http_download=true"
+        base = "https://www.bv-brc.org/api/pathway/?http_download=true"
         query = "&".join([genomes,limit_str,select])
         headers = {"accept":"text/tsv", "content-type":"application/rqlquery+x-www-form-urlencoded", 'Authorization': session.headers['Authorization']}
 
