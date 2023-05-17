@@ -206,7 +206,7 @@ def getGenomeIdsByGenomeGroup(genomeGroupName, Session, genomeGroupPath=False):
         return ret_ids
     except Exception as e:
         sys.stderr.write(f'Error getting genome ids from {genomeGroupName}:\n{e}\n')
-        sys.stderr.write(f'Dumping received json:\n{json.dump(data)}\n')
+        sys.stderr.write(f'Dumping received json:\n{json.dumps(data)}\n')
         return None
 
 # Returns a list of genome_ids from the passed in genus 
