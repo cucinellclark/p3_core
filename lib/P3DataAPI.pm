@@ -692,24 +692,41 @@ sub solr_query_raw_multi
 
         my $uri = URI->new($self->url . "/$core");
 
-        my %params = (start => 0, rows => 25000);
-        while (my($k, $v) = each %$params)
-        {
-            if (ref($v) eq 'ARRAY')
-            {
-                $v = join(",", @$v);
-            }
-            $params{$k} = $v;
-        }
+        my @params = (start => 0, rows => 25000);
+	if (ref($params) eq 'ARRAY')
+	{
+	    for my $ent (@$params)
+	    {
+		my($k, $v) = @$ent;
+		if (ref($v) eq 'ARRAY')
+		{
+		    $v = join(",", @$v);
+		}
+		push(@params, $k, $v);
+	    }
+	}
+	else
+	{
+	    while (my($k, $v) = each %$params)
+	    {
+		if (ref($v) eq 'ARRAY')
+		{
+		    $v = join(",", @$v);
+		}
+		push(@params, $k, $v);
+	    }
+	}
 
-        $uri->query_form(\%params);
+	# print Dumper(PARAMS => @params);
+        $uri->query_form(\@params);
 
-        # print STDERR "Query url: $uri\n";
-
-        my $req = GET($uri,
-                      "Content-type" => "application/solrquery+x-www-form-urlencoded",
-                      "Accept", "application/solr+json",
-                      $self->auth_header);
+	# print STDERR "Query url: $uri\n";
+	
+        my $req = POST($self->url . "/$core",
+				  "Content-type" => "application/solrquery+x-www-form-urlencoded",
+				  "Accept", "application/solr+json",
+				  $self->auth_header,
+				  "Content" => $uri->query);
 
         my $id = $async->add($req);
         $resmap{$id} = $i;
@@ -1239,6 +1256,60 @@ sub retrieve_protein_features_in_genome_in_export_format {
                     [ "eq",     "annotation",    "PATRIC" ],
                     [ "eq",     "genome_id",    $genome_id ],
                     [ "select", "patric_id,aa_sequence_md5,genome_name,product" ],
+                   );
+}
+
+
+
+=head3 B<retrieve_features_in_feature_group_in_export_format>
+
+Retrieve the features in the given feature group and write in export format
+to the provided filehandle.
+
+C<$feature_type> is either "aa" or "dna"
+
+=cut
+
+sub retrieve_features_in_feature_group_in_export_format
+{
+    my ( $self, $feature_group_path, $feature_type, $fasta_fh ) = @_;
+
+    my $md5_type;
+    if (lc($feature_type) eq 'aa') {
+	$md5_type = 'aa_sequence_md5';
+    } elsif (lc($feature_type) eq 'dna' || lc($feature_type) eq 'na') {
+	$md5_type = 'na_sequence_md5';
+    } else {
+	die "retrieve_features_in_feature_group_in_export_format: Invalid feature type '$feature_type'\n";
+    }
+
+    my $on_feature =  sub {
+        my ($data) = @_;
+
+        my %by_md5;
+
+        $self->lookup_sequence_data([map { $_->{$md5_type} } @$data ], sub {
+            my $ent = shift;
+            $by_md5{$ent->{md5}} = $ent;
+        });
+
+        for my $ent (@$data) {
+            my $def = "  $ent->{product} [$ent->{genome_name} | $ent->{genome_id}]";
+            print_alignment_as_fasta($fasta_fh,
+                                     [
+                                      $ent->{patric_id},
+                                      $def,
+                                      $by_md5{$ent->{$md5_type}}->{sequence}
+                                      ]
+                                    );
+        }
+        return 1;
+    };
+
+    $self->query_cb("genome_feature",
+                    $on_feature,
+		    [ "in",     "feature_id", "FeatureGroup(" . uri_escape($feature_group_path) . ")"],
+                    [ "select", "patric_id,$md5_type,genome_name,product,genome_id" ],
                    );
 }
 
@@ -2516,7 +2587,7 @@ sub genes_in_region_bulk_mysql
 
 sub genes_in_region_bulk
 {
-    my($self, $reqlist) = @_;
+    my($self, $reqlist, $tight) = @_;
 
     my @queries;
 
@@ -2528,16 +2599,41 @@ sub genes_in_region_bulk
         # We need to query with some slop because the solr schema currently does
         # not have left/right coordinates, rather start/end.
         #
+	# If we are doing a tight query, we can restrict the feature start and end to both
+	# be strictly in the region. We include a bit of slop here.
+	#
 
-        my $slop = 5000;
-        my $begx = ($beg > $slop + 1) ? $beg - $slop : 1;
-        my $endx = $end + $slop;
+	my @fq = (
+		  "sequence_id:$contig OR accession:$contig",
+		  "annotation:PATRIC",
+		  "NOT feature_type:source");
 
-        $begx = 1 if $begx < 1;
+	if ($tight)
+	{
+	    my $begx = $beg - 15;
+	    $begx = 1 if $begx < 1;
+	    my $endx = $end + 15;
+	    push(@fq,
+		 "start:[$begx TO $endx] AND end:[$begx TO $endx]",
+		);
+	}	    
+	else
+	{
+	    my $slop = 5000;
+	    my $begx = ($beg > $slop + 1) ? $beg - $slop : 1;
+	    my $endx = $end + $slop;
+	    
+	    $begx = 1 if $begx < 1;
 
-        push(@queries, ["genome_feature", { q => "genome_id:$genome AND (sequence_id:$contig OR accession:$contig) AND (start:[$begx TO $endx] OR end:[$begx TO $endx]) AND annotation:PATRIC AND NOT feature_type:source",
-                                                        fl => 'start,end,feature_id,product,figfam_id,strand,patric_id,pgfam_id,plfam_id,aa_sequence_md5,genome_name,feature_type',
-                                                    }]);
+	    push(@fq, "start:[$begx TO $endx] OR end:[$begx TO $endx]");
+	}
+
+	push(@queries, ["genome_feature",
+			[
+			 [q => "genome_id:$genome"],
+			 (map { [fq => $_] } @fq ),
+			 [fl => 'start,end,feature_id,product,figfam_id,strand,patric_id,pgfam_id,plfam_id,aa_sequence_md5,genome_name,feature_type'],
+			 ]]);
     }
 
     # print Dumper(Q => @queries);
