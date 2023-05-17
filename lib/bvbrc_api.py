@@ -200,9 +200,14 @@ def getGenomeIdsByGenomeGroup(genomeGroupName, Session, genomeGroupPath=False):
     query += "&select(genome_id)"
     query += "&limit(10000)"
     ret = Session.get(Base_url+"genome/", params=query)
-    data = json.loads(ret.text) 
-    ret_ids = [list(x.values())[0] for x in data]
-    return ret_ids
+    try:
+        data = json.loads(ret.text) 
+        ret_ids = [list(x.values())[0] for x in data]
+        return ret_ids
+    except Exception as e:
+        sys.stderr.write(f'Error getting genome ids from {genomeGroupName}:\n{e}\n')
+        sys.stderr.write(f'Dumping received json:\n{json.dump(data)}\n')
+        return None
 
 # Returns a list of genome_ids from the passed in genus 
 def getGenomeDataFrameByGenus(genus, Session, limit=50000):
