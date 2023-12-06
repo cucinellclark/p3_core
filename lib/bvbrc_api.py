@@ -44,7 +44,7 @@ def getQueryDataText(base, query, headers, print_query = True):
             if r.encoding is None:
                 r.encoding = "utf-8"
             if not r.ok:
-                sys.stderr.write("Error in API request \n")
+                sys.stderr.write(f"Error in API request:\n {r.reason} \n")
                 return None
             #for line in r.iter_lines(decode_unicode=True):
             #    yield line
