@@ -78,13 +78,8 @@ def getFeatureDataFrame(genome_ids, session, limit=2500000):
         # TODO: set column data types
         if batch == '':
             continue
-        try:
-            feature_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype=dtype_dict)
-            feature_df_list.append(feature_df)
-        except Exception as e:
-            import pdb
-            pdb.set_trace()
-            print(f'error = {e}')
+        feature_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype=dtype_dict)
+        feature_df_list.append(feature_df)
     if len(feature_df_list) > 0:
         return_df = pd.concat(feature_df_list) 
         return return_df
