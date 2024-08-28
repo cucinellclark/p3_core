@@ -62,6 +62,8 @@ use constant OBJECTS => {   genome => 'genome',
                             protein_structure => 'protein_structure',
                             surveillance => 'surveillance',
                             serology => 'serology',
+                            sf => 'sequence_feature',
+                            sfvt => 'sequence_feature_vt'
 };
 
 =head3 FIELDS
@@ -97,6 +99,8 @@ use constant FIELDS =>  {   genome => ['genome_name', 'genome_id', 'genome_statu
                             serology => ['sample_identifier', 'host_identifier', 'host_type', 'host_species', 'host_common_name',
                                             'host_sex', 'host_age', 'host_age_group', 'host_health', 'collection_date', 'test_type', 'test_result',
                                             'serotype'],
+                            sf => ['sf_id', 'sf_name', 'sf_category', 'gene', 'length', 'sf_category', 'start', 'end', 'source_strain' ],
+                            sfvt => ['sf_id', 'sf_name', 'sf_category', 'sfvt_id', 'sfvt_genome_count', 'sfvt_sequence'],
 };
 
 =head3 IDCOL
@@ -124,6 +128,8 @@ use constant IDCOL =>   {   genome => 'genome_id',
                             protein_structure => 'pdb_id',
                             surveillance => 'sample_identifier',
                             serology => 'sample_identifier',
+                            sf => 'sf_id',
+                            sfvt => 'sfvt_id'
                         };
 
 =head3 DERIVED
