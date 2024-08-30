@@ -129,7 +129,7 @@ use constant IDCOL =>   {   genome => 'genome_id',
                             surveillance => 'sample_identifier',
                             serology => 'sample_identifier',
                             sf => 'sf_id',
-                            sfvt => 'sfvt_id'
+                            sfvt => 'id'
                         };
 
 =head3 DERIVED
@@ -819,6 +819,9 @@ sub clean_value {
     $value =~ s/^\s+//;
     $value =~ s/\s+$//;
     $value =~ s/'//;
+    if ($value =~ /^[^"].+\s/) {
+        $value = "\"$value\"";
+    }
     return $value;
 }
 
@@ -966,7 +969,7 @@ sub get_data_batch {
     my $computed = _select_list($object, $cols);
     my @mods = (['select', @keyList, @$computed], @$filter);
     # Now get the list of key values. These are not cleaned, because we are doing exact matches.
-    my @keys = grep { $_ ne '' } map { $_->[0] } @$couplets;
+    my @keys = grep { $_ ne '' } map { clean_value($_->[0]) } @$couplets;
     # Only proceed if we have at least one key.
     if (scalar @keys) {
         # Create a filter for the keys.

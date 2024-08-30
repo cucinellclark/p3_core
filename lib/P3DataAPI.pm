@@ -99,7 +99,7 @@ __PACKAGE__->mk_accessors(qw(benchmark chunk_size url ua reference_genome_cache
                              debug redis
                             ));
 
-our %EncodeMap = ('<' => '%60', '=' => '%61', '>' => '%62', '"' => '%34', '#' => '%35', '%' => '%37',
+our %EncodeMap = ('<' => '%60', '=' => '%61', '>' => '%62', '"' => '%22', '#' => '%35', '%' => '%37',
                   '+' => '%43', '/' => '%47', ':' => '%3A', '{' => '%7B', '|' => '%7C', '}' => '%7D',
                   '^' => '%94', '`' => '%96', '&' => '%26', "'" => '%27');
 
@@ -307,7 +307,7 @@ sub query
         if (! $self->{raw}) {
             $q = $self->url_encode($q);
         }
-        $q =~ s/ /+/g;
+        $q =~ s/ /%20/g;
         # POST query - we retry 5 times after error
         my ($resp, $data) = $self->submit_query($core, $q);
         # print STDERR $resp->content;
@@ -425,10 +425,10 @@ sub submit_query {
             if ($tries >= 15) {
                 die "Failing after $tries tries: $error";
             } else {
-        if ($g_log_fh)
-        {
-            print $g_log_fh "ERROR: " . substr($error, 0, 200) . "\n";
-        }
+                if ($g_log_fh)
+                {
+                    print $g_log_fh "ERROR: " . substr($error, 0, 200) . "\n";
+                }
                 my $qabbrv = substr($q, 0, 500) . (length($q) > 500 ? '...' : "");
                 $self->_log("Retrying $qabbrv\n");
                 $tries++;
