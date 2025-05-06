@@ -14,7 +14,13 @@ use gjoseqlib;
 use URI::Escape;
 use Digest::MD5 'md5_hex';
 use Time::HiRes 'gettimeofday';
-use DBI;
+
+our $have_dbi;
+eval {
+    require DBI;
+    $have_dbi = 1;
+};
+
 use HTTP::Request::Common;
 use Data::Dumper;
 
