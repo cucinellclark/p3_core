@@ -26,7 +26,7 @@ use Data::Dumper;
 
 our $have_workspace;
 eval {
-    require P3WorkspaceClient;
+    require Bio::P3::Workspace::WorkspaceClientExt;
     $have_workspace = 1;
 };
 
@@ -1081,7 +1081,7 @@ sub retrieve_patricids_from_feature_group {
 
     if ($have_workspace)
     {
-	my $ws = P3WorkspaceClientExt->new();
+	my $ws = Bio::P3::Workspace::WorkspaceClientExt->new();
 
 	my $raw_group = $ws->get({ objects => [$feature_group_path] });
 	my($meta, $data_txt) = @{$raw_group->[0]};
