@@ -1123,7 +1123,7 @@ sub retrieve_feature_ids_from_feature_group {
 
     if ($have_workspace)
     {
-	my $ws = P3WorkspaceClientExt->new();
+	my $ws = Bio::P3::Workspace::WorkspaceClientExt->new();
 
 	my $raw_group = $ws->get({ objects => [$feature_group_path] });
 	my($meta, $data_txt) = @{$raw_group->[0]};
