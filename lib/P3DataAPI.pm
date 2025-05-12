@@ -3,6 +3,7 @@ package P3DataAPI;
 # This is a SAS Component
 
 # Updated for new PATRIC.
+use Carp::Always;
 
 use File::Temp qw(:seekable);
 use LWP::UserAgent;
@@ -13,9 +14,22 @@ use gjoseqlib;
 use URI::Escape;
 use Digest::MD5 'md5_hex';
 use Time::HiRes 'gettimeofday';
-use DBI;
+
+our $have_dbi;
+eval {
+    require DBI;
+    $have_dbi = 1;
+};
+
 use HTTP::Request::Common;
 use Data::Dumper;
+
+our $have_workspace;
+eval {
+    require Bio::P3::Workspace::WorkspaceClientExt;
+    $have_workspace = 1;
+};
+
 eval {
     require IPC::Run;
 };
@@ -168,7 +182,7 @@ sub new {
             warn "Redis requested but Redis::Client not available in this perl environment";
         }
     }
-
+# print STDERR "DATA API $self->{url} FC=$FIG_Config::p3_data_api_url\n";
     return bless $self, $class;
 }
 
@@ -919,7 +933,7 @@ sub lookup_sequence_data
 {
     my($self, $ids, $cb) = @_;
 
-    my $batchsize = 500;
+    my $batchsize = 5000;
     my @goodIds = grep { $_ } @$ids;
     my $n = @goodIds;
     my $end;
@@ -1065,20 +1079,76 @@ sub retrieve_protein_features_in_genomes {
 sub retrieve_patricids_from_feature_group {
     my ( $self, $feature_group_path) = @_;
 
-    my @names = ();
-    $self->query_cb("genome_feature",
-                    sub {
-                        my ($data) = @_;
-            push @names, grep { $_ } map { $_->{patric_id} } @$data;
-                        #for my $ent (@$data) {
-            #push @names, $ent->{patric_id};
-                        #}
-                        return 1;
-                    },
-                    [ "in",     "feature_id", "FeatureGroup(" . uri_escape($feature_group_path) . ")"],
-            ['select', 'patric_id,feature_id']
-                   );
-    return \@names
+    if ($have_workspace)
+    {
+	my $ws = Bio::P3::Workspace::WorkspaceClientExt->new();
+
+	my $raw_group = $ws->get({ objects => [$feature_group_path] });
+	my($meta, $data_txt) = @{$raw_group->[0]};
+	my $data = decode_json($data_txt);
+	my $list = $data->{id_list}->{feature_id};
+
+	my @members = @$list;
+	my @out;
+	while (@members)
+	{
+	    my @chunk = splice(@members, 0, 500);
+	    my $qry = join(" OR ", map { "\"$_\"" } @chunk);
+	    my $res = $self->solr_query("genome_feature", { q => "feature_id:($qry)", fl => "feature_id,patric_id" });
+	    push(@out, map { $_->{patric_id} } @$res);
+	}
+	return \@out;
+    }
+    else
+    {
+	my @names = ();
+	$self->query_cb("genome_feature",
+			sub {
+			    my ($data) = @_;
+			    push @names, grep { $_ } map { $_->{patric_id} } @$data;
+			    #for my $ent (@$data) {
+			    #push @names, $ent->{patric_id};
+			    #}
+			    return 1;
+			},
+			[ "in",     "feature_id", "FeatureGroup(" . uri_escape($feature_group_path) . ")"],
+			['select', 'patric_id,feature_id']
+		       );
+	return \@names
+    }
+}
+
+sub retrieve_feature_ids_from_feature_group {
+    my ( $self, $feature_group_path) = @_;
+
+    if ($have_workspace)
+    {
+	my $ws = Bio::P3::Workspace::WorkspaceClientExt->new();
+
+	my $raw_group = $ws->get({ objects => [$feature_group_path] });
+	my($meta, $data_txt) = @{$raw_group->[0]};
+	my $data = decode_json($data_txt);
+	my $list = $data->{id_list}->{feature_id};
+
+	return $list;
+    }
+    else
+    {
+	my @names = ();
+	$self->query_cb("genome_feature",
+			sub {
+			    my ($data) = @_;
+			    push @names, grep { $_ } map { $_->{feature_id} } @$data;
+			    #for my $ent (@$data) {
+			    #push @names, $ent->{patric_id};
+			    #}
+			    return 1;
+			},
+			[ "in",     "feature_id", "FeatureGroup(" . uri_escape($feature_group_path) . ")"],
+			['select', 'feature_id']
+		       );
+	return \@names
+    }
 }
 
 sub retrieve_protein_sequences_from_feature_group {
@@ -1149,16 +1219,29 @@ sub retrieve_patric_ids_from_genome_group {
     return \@names
 }
 
+#
+# $use_feature_id true if we wish to match feature_id instead of patric_id
+#
 sub retrieve_protein_feature_sequence {
-    my ( $self, $fids) = @_;
+    my ( $self, $fids, $use_feature_id) = @_;
 
     my %map;
 
     #
     # Query for features.
     #
+    # Block the query into 500 id chunks to mitigate Solr timeouts.
+    #
 
-    $self->query_cb("genome_feature",
+    my @todo = @$fids;
+
+    my $id_field = $use_feature_id ? "feature_id" : "patric_id";
+
+    while (@todo)
+    {
+	my(@chunk) = splice(@todo, 0, 5000);
+
+	$self->query_cb("genome_feature",
                     sub {
                         my ($data) = @_;
                         for my $ent (@$data) {
@@ -1168,9 +1251,10 @@ sub retrieve_protein_feature_sequence {
                         return 1;
                     },
                     [ "in",     "feature_type", "(mat_peptide,CDS)" ],
-                    [ "in",     "patric_id", "(" . join(",", map { uri_escape($_) } @$fids) . ")"],
+                    [ "in",     $id_field, "(" . join(",", map { uri_escape($_) } @chunk) . ")"],
                     [ "select", "patric_id,aa_sequence_md5" ],
-                   );
+		       );
+    }
 
     #
     # Query for sequences.
@@ -1186,13 +1270,18 @@ sub retrieve_protein_feature_sequence {
     return \%out;
 }
 
+#
+# $use_feature_id true if we wish to match feature_id instead of patric_id
+#
 sub retrieve_nucleotide_feature_sequence {
-    my ( $self, $fids) = @_;
+    my ( $self, $fids, $use_feature_id) = @_;
 
     my %map;
 
     return {} if @$fids == 0;
 
+    my $id_field = $use_feature_id ? "feature_id" : "patric_id";
+    
     #
     # Query for features.
     #
@@ -1206,7 +1295,7 @@ sub retrieve_nucleotide_feature_sequence {
                         }
                         return 1;
                     },
-                    [ "in",     "patric_id", "(" . join(",", map { uri_escape($_) } @$fids) . ")"],
+                    [ "in",     $id_field, "(" . join(",", map { uri_escape($_) } @$fids) . ")"],
                     [ "select", "patric_id,na_sequence_md5" ],
                    );
 
