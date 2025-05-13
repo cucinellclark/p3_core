@@ -1281,7 +1281,7 @@ sub retrieve_nucleotide_feature_sequence {
     return {} if @$fids == 0;
 
     my $id_field = $use_feature_id ? "feature_id" : "patric_id";
-    
+
     #
     # Query for features.
     #
@@ -3816,6 +3816,7 @@ sub gto_of {
                           "alt_locus_tag", "refseq_locus_tag",
                           "protein_id",    "gene_id",
                           "gi",            "gene",
+                          "uniprotkb_accession",
                           "go", "genome_id",
                           "pgfam_id", "plfam_id"
                           ]
@@ -3846,10 +3847,12 @@ sub gto_of {
                  ];
             }
             my @aliases;
-            push( @aliases, "gi|$f->{gi}" )          if $f->{gi};
-            push( @aliases, $f->{gene} )             if $f->{gene};
-            push( @aliases, "GeneID:$f->{gene_id}" ) if $f->{gene_id};
-            push( @aliases, $f->{refseq_locus_tag} ) if $f->{refseq_locus_tag};
+            push( @aliases, ["gi", $f->{gi}] )          			if $f->{gi};
+            push( @aliases, ["gene_name", $f->{gene}] )             if $f->{gene};
+            push( @aliases, ["GeneID", $f->{gene_id}] ) 			if $f->{gene_id};
+            push( @aliases, ["protein_id", $f->{protein_id}] )		if $f->{protein_id};
+            push( @aliases, ["UniProt", $f->{uniprotkb_accession}])	if $f->{uniprotkb_accession};
+            push( @aliases, ["LocusTag", $f->{refseq_locus_tag}] )	if $f->{refseq_locus_tag};
             my @familyList;
             if ($f->{pgfam_id}) {
                 push @familyList, ['PGFAM', $f->{pgfam_id}];
@@ -3874,7 +3877,7 @@ sub gto_of {
                                  -type                => $f->{feature_type},
                                  -function            => $f->{product},
                                  -protein_translation => $sequences->{$f->{aa_sequence_md5}},
-                                 -aliases             => \@aliases,
+                                 -alias_pairs         => \@aliases,
                                  -go_terms			  => \@goTerms,
                                  -family_assignments => \@familyList
                                  }
