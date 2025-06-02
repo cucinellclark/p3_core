@@ -290,6 +290,11 @@ text search against entire records.
 
 Display debugging information on STDERR.
 
+=item limit
+
+Specify the maximum number of records to return. (The default is all records.) This is the maximum returned from
+the database, for performance reasons. The number of records actually returned may be substantially lower.
+
 =back
 
 =cut
@@ -307,6 +312,7 @@ sub data_options {
             ['keyword=s', 'if specified, a keyword or phrase that shoould be in at least one field of every record'],
             ['required|r=s@', 'field(s) required to have values'],
             ['debug', 'display debugging on STDERR'],
+            ['limit=i', 'maximum number of results to return'],
             delim_options());
 }
 
@@ -787,6 +793,13 @@ sub select_clause {
     if ($opt->debug) {
         $p3->debug_on(\*STDERR);
     }
+    # Check for a hard limit.
+    my $hardLimit = $opt->limit;
+    if (defined $hardLimit) {
+		$p3->set_limit($hardLimit);
+	} else {
+		$p3->clear_limit();
+	}
     # Return the results.
     return ($attrList, \@headers);
 }

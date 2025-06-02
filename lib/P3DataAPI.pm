@@ -152,6 +152,7 @@ sub new {
     my $self = {
         url        => $url,
         chunk_size => 25000,
+        limit 	   => undef,
         ua         => LWP::UserAgent->new(),
         token      => $token,
         benchmark  => 0,
@@ -214,6 +215,41 @@ TRUE to turn on raw mode; FALSE to turn it off.
 sub set_raw {
     my ($self, $mode) = @_;
     $self->{raw} = $mode;
+}
+
+=head3 set_limit
+
+	$d->set_limit($new_limit);
+
+Set the return limit. If this parameter has a defined value, it places a hard limit on the number of results
+returned, and any results returned decrement the limit. Use L<clear_limit> to turn this feature off.
+
+=over 4
+
+=item new_limit
+
+New result-limit value to save.
+
+=back
+
+=cut
+
+sub set_limit {
+	my ($self, $new_limit) = @_;
+	$self->{limit} = $new_limit;
+}
+
+=head3 clear_limit
+
+	$d->clear_limit();
+
+Turn off the result-limiting feature.
+
+=cut
+
+sub clear_limit {
+	my ($self) = @_;
+	$self->{limit} = undef;
 }
 
 =head3 query
@@ -302,47 +338,70 @@ sub query
     my $start = 0;
 
     my @result;
-    while ( !$done ) {
+    while ( !$done) {
         my $lim;
-        if (! $limitFound) {
-            $lim = "limit($chunk,$start)";
-        } else {
-            $lim = "limit($limitFound,0)";
-            $done = 1;
-        }
-    my $q   = "$qstr&$lim";
+        # Compute the limit clause. A coded limit overrides everything. Otherwise, the hard limit is
+        # checked. The maximum limit is the chunk size. If $start is nonzero, then we are getting
+        # a chunk on a secondary call. If the hard limit is zero, we are done.
+        if (defined $self->{limit} && $self->{limit} <= 0) {
+			$done = 1;
+		} else {
+	        if ($limitFound) {
+				# Here we have a limit override.
+				$lim = "limit($limitFound,0)";
+				$done = 1;
+			} elsif (! defined $self->{limit}) {
+				# No hard limit, so get a chunk.
+				$lim = "limit($chunk,$start)";
+			} else {
+				# Here we have a hard limit. This could reduce the chunk size.
+				my $computed_lim = $chunk;
+				if ($computed_lim > $self->{limit}) {
+					$computed_lim = $self->{limit};
+				}
+				$lim = "limit($computed_lim,$start)";
+			}
+			$self->_log("Limit clause is $lim.\n");
+		    my $q   = "$qstr&$lim";
 
-        #       print STDERR "Qry $url '$q'\n";
-        #	my $resp = $ua->post($url,
-        #			     Accept => "application/json",
-        #			     Content => $q);
-        my $end;
-        # Form url-encoding
-        if (! $self->{raw}) {
-            $q = $self->url_encode($q);
-        }
-        $q =~ s/ /%20/g;
-        # POST query - we retry 5 times after error
-        my ($resp, $data) = $self->submit_query($core, $q);
-        # print STDERR $resp->content;
+	        #       print STDERR "Qry $url '$q'\n";
+	        #	my $resp = $ua->post($url,
+	        #			     Accept => "application/json",
+	        #			     Content => $q);
+	        my $end;
+	        # Form url-encoding
+	        if (! $self->{raw}) {
+	            $q = $self->url_encode($q);
+	        }
+	        $q =~ s/ /%20/g;
+	        # POST query - we retry 5 times after error
+	        my ($resp, $data) = $self->submit_query($core, $q);
+	        # print STDERR $resp->content;
 
-        push @result, @$data;
+	        push @result, @$data;
+	        # Update the hard limit, if needed.
+	        if (defined $self->{limit}) {
+				$self->{limit} -= scalar @$data;
+				$self->_log("New limit is $self->{limit}.\n");
+			}
 
-        #        print STDERR scalar(@$data) . " results found.\n";
-        my $r = $resp->header('content-range');
-
-        #	print "r=$r\n";
-        if ( $r =~ m,items\s+(\d+)-(\d+)/(\d+), ) {
-            my $this_start = $1;
-            my $next       = $2;
-            my $count      = $3;
-            if (! $started && $count >= 500) {
-                # $self->_log("$count results expected.\n");
-                $started = 1;
-            }
-            last if ( $next >= $count );
-            $start = $next;
-        }
+	        #        print STDERR scalar(@$data) . " results found.\n";
+	        # Do the chunking here. We use the content range to figure out
+	        # if another chunk is needed.
+	        my $r = $resp->header('content-range');
+	        #	print "r=$r\n";
+	        if ( $r =~ m,items\s+(\d+)-(\d+)/(\d+), ) {
+	            my $this_start = $1;
+	            my $next       = $2;
+	            my $count      = $3;
+	            if (! $started && $count >= 500) {
+	                # $self->_log("$count results expected.\n");
+	                $started = 1;
+	            }
+	            last if ( $next >= $count );
+	            $start = $next;
+	        }
+		}
     }
     return @result;
 }
@@ -407,12 +466,14 @@ sub submit_query {
     my $tries = 0;
     while (! $resp) {
     # print STDERR "content = $q\n";
+    $self->_log("Submitting to $core: $q\n");
     my $t1 = gettimeofday;
         my $response = $ua->post($url,
                              Accept => "application/json",
                              $self->auth_header,
                              Content => $q,
                         );
+    $self->_log("Response received from $core.\n");
     my $t2 = gettimeofday;
     if ($g_log_fh)
     {
