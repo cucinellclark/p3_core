@@ -361,7 +361,6 @@ sub query
 				}
 				$lim = "limit($computed_lim,$start)";
 			}
-			$self->_log("Limit clause is $lim.\n");
 		    my $q   = "$qstr&$lim";
 
 	        #       print STDERR "Qry $url '$q'\n";
@@ -382,7 +381,6 @@ sub query
 	        # Update the hard limit, if needed.
 	        if (defined $self->{limit}) {
 				$self->{limit} -= scalar @$data;
-				$self->_log("New limit is $self->{limit}.\n");
 			}
 
 	        #        print STDERR scalar(@$data) . " results found.\n";
@@ -395,7 +393,6 @@ sub query
 	            my $next       = $2;
 	            my $count      = $3;
 	            if (! $started && $count >= 500) {
-	                # $self->_log("$count results expected.\n");
 	                $started = 1;
 	            }
 	            last if ( $next >= $count );
@@ -466,14 +463,14 @@ sub submit_query {
     my $tries = 0;
     while (! $resp) {
     # print STDERR "content = $q\n";
-    $self->_log("Submitting to $core: $q\n");
+    # $self->_log("Submitting to $core: $q\n");
     my $t1 = gettimeofday;
         my $response = $ua->post($url,
                              Accept => "application/json",
                              $self->auth_header,
                              Content => $q,
                         );
-    $self->_log("Response received from $core.\n");
+    # $self->_log("Response received from $core.\n");
     my $t2 = gettimeofday;
     if ($g_log_fh)
     {
