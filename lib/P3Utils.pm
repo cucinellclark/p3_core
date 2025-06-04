@@ -28,6 +28,7 @@ package P3Utils;
     use SeedUtils;
     use Digest::MD5;
     use RoleParse;
+    use P3View;
 
 =head1 PATRIC Script Utilities
 
@@ -784,7 +785,7 @@ sub select_clause {
     die "Invalid object $object." if (! $realName);
     # Here we need to load the P3View if there is one specified. If not, a null view is attached to the $p3
     # automatically.
-    $p3->{view} = P3View->new($opt->view);
+    $p3->{view} = P3View->new($opt->view, $object);
     # Get the attribute option.
     my $attrList = $opt->attr;
     if ($opt->count) {

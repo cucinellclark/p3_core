@@ -93,7 +93,7 @@ sub new {
                             die "Invalid field mapping format in file $fileName: expected an array of two elements.";
                         }
                     }
-                    $self->{$table} = [\%forward, \%reverse];
+                    $self = [\%forward, \%reverse];
                 }
             }
         } else {
