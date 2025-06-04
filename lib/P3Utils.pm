@@ -698,9 +698,10 @@ sub form_filter {
             } else {
                 die "Invalid --$op specification $opSpec.";
             }
-            ##TODO: apply the P3View if any
+            # Convert the field name to internal format.
+            my $internalField = $p3->{view}->col_to_internal($field);
             # Apply the constraint.
-            push @retVal, [$op, $field, $value];
+            push @retVal, [$op, $internalField, $value];
         }
     }
     # Get the inclusion constraints.
@@ -781,7 +782,9 @@ sub select_clause {
     # Validate the object.
     my $realName = OBJECTS->{$object};
     die "Invalid object $object." if (! $realName);
-    ## TODO load the P3View if any
+    # Here we need to load the P3View if there is one specified. If not, a null view is attached to the $p3
+    # automatically.
+    $p3->{view} = P3View->new($opt->view);
     # Get the attribute option.
     my $attrList = $opt->attr;
     if ($opt->count) {
@@ -792,22 +795,27 @@ sub select_clause {
             # Just return a count header.
             $attrList = ['count'];
         }
-    } elsif (! $attrList) {
-        if ($idFlag) {
-            $attrList = [IDCOL->{$object}];
-        } elsif ($default) {
-            $attrList = $default;
-        } else {
-            $attrList = FIELDS->{$object};
-        }
     } else {
-        # Handle comma-splicing.
-        $attrList = [ map { split /,/, $_ } @$attrList ];
-        # If we need an ID field, be sure it's in there.
-        if ($idFlag) {
-            my $idCol = IDCOL->{$object};
-            if (! scalar(grep { $_ eq $idCol } @$attrList)) {
-                unshift @$attrList, $idCol;
+        if (! $attrList) {
+            if ($idFlag) {
+                $attrList = IDCOL->{$object};
+            } elsif ($default) {
+                $attrList = $default;
+            } else {
+                $attrList = FIELDS->{$object};
+            }
+            # Un-translate this attribute list so it is in pre-view format.
+            $attrList = $p3->{view}->internal_list_to_col($attrList);
+        } else {
+            # Compute the pre-view (untranslated) version of the ID field.
+            my $idCol = $p3->{view}->col_to_internal(IDCOL->{$object});      
+            # Handle comma-splicing.
+            $attrList = [ map { split /,/, $_ } @$attrList ];
+            # If we need an ID field, be sure it's in there.
+            if ($idFlag) {
+                if (! scalar(grep { $_ eq $idCol } @$attrList)) {
+                    unshift @$attrList, $idCol;
+                }
             }
         }
     }
@@ -817,7 +825,8 @@ sub select_clause {
     if ($opt->count) {
         undef $attrList;
     } else {
-        ##TODO: translate the attribute names using the P3View
+        # Translate the attribute list here to internal.
+        $attrList = $p3->{view}->col_list_to_internal($attrList);
     }
     # Check for the debug option.
     if ($opt->debug) {
@@ -1720,8 +1729,7 @@ sub list_object_fields {
     P3Utils::_process_entries($p3, $object, \@retList, \@entries, \@row, \@cols, $id, $keyField);
 
 Process the specified results from a PATRIC query and store them in the output list. It's worth
-noting that the column name list will have untranslated (pre-view) column names rather than
-internal names, and this needs to be handled.
+noting that the column name list will have internal column names.
 
 =over 4
 
@@ -1768,7 +1776,6 @@ sub _process_entries {
         # Yes. Pop on the count.
         push @$retList, [@$row, scalar grep { $_->{$id} } @$entries];
     } else {
-        ## TODO translate column names if there is a view
         # No. Generate the data. First we need the related-field hash.
         my $relatedH = RELATED->{$object};
         my $multiH = DERIVED_MULTI->{$object};
@@ -2067,7 +2074,7 @@ sub _ec_parse {
     my $fieldList = _select_list($p3, $object, $cols);
 
 Compute the list of fields required to retrieve the specified columns. This includes the specified normal fields plus any derived fields.
-Since the input is a column name list, the column names are pre-translated and must be converted into internal field names.
+The input list must contain internal column names.
 
 =over 4
 
@@ -2094,7 +2101,6 @@ sub _select_list {
     # Get the modified-field hashes.
     my $derivedH = DERIVED->{$object};
     my $relatedH = RELATED->{$object};
-    ## TODO translate the column names if there is a P3View
     # Loop through the field names.
     for my $col (@$cols) {
         my $algorithm = $relatedH->{$col};
