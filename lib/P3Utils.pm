@@ -33,6 +33,17 @@ package P3Utils;
 
 This module contains shared utilities for PATRIC 3 scripts.
 
+The bulk of this module is concerned with presenting a model for using the PATRIC database. The model is
+defined by various constants that translate table and field names to more user-friendly versions and
+present derived fields.
+
+This process is complicated by the existence of views. A set of field names can be translated (post-view) or
+untranslated (pre-view). Every method that deals with field names must be aware of whether it is translated
+or not. The L<P3View> object that manages the translations is kept in the L<P3DataAPI> object that is passed
+to most methods. In general, column names and header lists are always untranslated. The major translators
+are L<P3Utils::select_clause> and L<P3Utils::form_filter>, which take untranslated (pre-view) names as input
+and produce translated names on the output.
+
 =head2 Constants
 
 These constants define the sort-of ER model for PATRIC.
@@ -295,6 +306,10 @@ Display debugging information on STDERR.
 Specify the maximum number of records to return. (The default is all records.) This is the maximum returned from
 the database, for performance reasons. The number of records actually returned may be substantially lower.
 
+=item view
+
+Specify the name of a L<P3View> file to use for translating field names.
+
 =back
 
 =cut
@@ -313,6 +328,7 @@ sub data_options {
             ['required|r=s@', 'field(s) required to have values'],
             ['debug', 'display debugging on STDERR'],
             ['limit=i', 'maximum number of results to return'],
+            ['view=s', 'name of P3View file to use for translating field names'],
             delim_options());
 }
 
@@ -530,6 +546,8 @@ sub get_col {
     my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, $opt, $keyless);
 
 Read the header line from a tab-delimited input, format the output headers and compute the index of the key column.
+Note that this entire process is performed on untranslated (pre-view) field names. The key column is specified
+by a parameter in the options, so it is also untranslated.
 
 =over 4
 
@@ -582,7 +600,8 @@ sub process_headers {
     my $keyCol = P3Utils::find_column($col, \@headers, $optional);
 
 Determine the correct (0-based) index of the key column in a file from a column specifier and the headers.
-The column specifier can be a 1-based index or the name of a header.
+The column specifier can be a 1-based index or the name of a header. Since the header is always untranslated
+(pre-view), the key column name must be, too.
 
 =over 4
 
@@ -635,11 +654,16 @@ sub find_column {
 
 =head3 form_filter
 
-    my $filterList = P3Utils::form_filter($opt);
+    my $filterList = P3Utils::form_filter($p3, $opt);
 
-Compute the filter list for the specified options.
+Compute the filter list for the specified options. Note that the options specify untranslated (pre-view) column names,
+but the filter must be built using translated (internal) column names.
 
 =over 4
+
+=item p3
+
+A L<P3DataAPI> object used to access PATRIC. This is used to apply the P3View, if any.
 
 =item opt
 
@@ -654,7 +678,7 @@ Returns a reference to a list of filter specifications for a call to L<P3DataAPI
 =cut
 
 sub form_filter {
-    my ($opt) = @_;
+    my ($p3, $opt) = @_;
     # This will be the return list.
     my @retVal;
     # Get the relational operator constraints.
@@ -674,6 +698,7 @@ sub form_filter {
             } else {
                 die "Invalid --$op specification $opSpec.";
             }
+            ##TODO: apply the P3View if any
             # Apply the constraint.
             push @retVal, [$op, $field, $value];
         }
@@ -713,7 +738,9 @@ sub form_filter {
     my ($selectList, $newHeaders) = P3Utils::select_clause($p3, $object, $opt, $idFlag, \@default);
 
 Determine the list of fields to be returned for the current query. If an C<--attr> option is present, its
-listed fields are used. Otherwise, a default list is used.
+listed fields are used. Otherwise, a default list is used. The default list is translated (internal names),
+but an explicit attribute list from the command-line options will be pre-view (untranslated names) and
+must be translated to form the select clause.
 
 =over 4
 
@@ -754,6 +781,7 @@ sub select_clause {
     # Validate the object.
     my $realName = OBJECTS->{$object};
     die "Invalid object $object." if (! $realName);
+    ## TODO load the P3View if any
     # Get the attribute option.
     my $attrList = $opt->attr;
     if ($opt->count) {
@@ -788,6 +816,8 @@ sub select_clause {
     # Clear the attribute list if we are counting.
     if ($opt->count) {
         undef $attrList;
+    } else {
+        ##TODO: translate the attribute names using the P3View
     }
     # Check for the debug option.
     if ($opt->debug) {
@@ -845,7 +875,7 @@ sub clean_value {
 
 Return all of the indicated fields for the indicated entity (object) with the specified constraints.
 It should be noted that this method is simply a less-general interface to L<P3DataAPI/query> that handles standard
-command-line script options for filtering.
+command-line script options for filtering. Everything passed to this method must use internal field names.
 
 =over 4
 
@@ -896,7 +926,7 @@ sub get_data {
     if (! $cols) {
         @selected = $idCol;
     } else {
-        my $computed = _select_list($object, $cols);
+        my $computed = _select_list($p3,$object, $cols);
         @selected = @$computed;
     }
     my @mods = (['select', @selected], @$filter);
@@ -927,7 +957,7 @@ sub get_data {
 
 Return all of the indicated fields for the indicated entity (object) with the specified constraints.
 This version differs from L</get_data> in that the couplet keys are matched to a true key field (the
-matches are exact).
+matches are exact).  Everything passed to this method must use internal field names.
 
 =over 4
 
@@ -979,7 +1009,7 @@ sub get_data_batch {
     if (! scalar(grep { $_ eq $keyField } @$cols)) {
         @keyList = ($keyField);
     }
-    my $computed = _select_list($object, $cols);
+    my $computed = _select_list($p3, $object, $cols);
     my @mods = (['select', @keyList, @$computed], @$filter);
     # Now get the list of key values. These are not cleaned, because we are doing exact matches.
     my @keys = grep { $_ ne '' } map { clean_value($_->[0]) } @$couplets;
@@ -1022,6 +1052,7 @@ sub get_data_batch {
 
 Return all of the indicated fields for the indicated entity (object) with the specified constraints.
 The query is by key, and the keys are split into batches to prevent PATRIC from overloading.
+Everything passed to this method must use internal field names.
 
 =over 4
 
@@ -1071,7 +1102,7 @@ sub get_data_keyed {
     if (! scalar(grep { $_ eq $keyField } @$cols)) {
         @keyList = ($keyField);
     }
-    my $computed = _select_list($object, $cols);
+    my $computed = _select_list($p3, $object, $cols);
     my @mods = (['select', @keyList, @$computed], @$filter);
     # Create a filter for the keys.  We loop through the keys, a group at a time.
     my $n = @$keys;
@@ -1456,7 +1487,8 @@ sub protein_fasta {
     my (\@headers, \@cols) = P3Utils::find_headers($ih, $fileType => @fields);
 
 Search the headers of the specified input file for the named fields and return the list of headers plus a list of
-the column indices for the named fields.
+the column indices for the named fields. Since this method deals with headers, all the field names are untranslated
+(that is, pre-view, not internal).
 
 =over 4
 
@@ -1687,7 +1719,9 @@ sub list_object_fields {
 
     P3Utils::_process_entries($p3, $object, \@retList, \@entries, \@row, \@cols, $id, $keyField);
 
-Process the specified results from a PATRIC query and store them in the output list.
+Process the specified results from a PATRIC query and store them in the output list. It's worth
+noting that the column name list will have untranslated (pre-view) column names rather than
+internal names, and this needs to be handled.
 
 =over 4
 
@@ -1734,6 +1768,7 @@ sub _process_entries {
         # Yes. Pop on the count.
         push @$retList, [@$row, scalar grep { $_->{$id} } @$entries];
     } else {
+        ## TODO translate column names if there is a view
         # No. Generate the data. First we need the related-field hash.
         my $relatedH = RELATED->{$object};
         my $multiH = DERIVED_MULTI->{$object};
@@ -1890,7 +1925,8 @@ sub _related_field {
     P3Utils::_execute_query($p3, $core, $keyField, $dataField, \@keys, \%retHash, $multi);
 
 Execute a query to get the data values associated with a key. The mapping
-from keys to data values is added to the specified hash.
+from keys to data values is added to the specified hash. This method is used for processing
+related fields, and uses internal field names for everything.
 
 =over 4
 
@@ -1948,7 +1984,8 @@ sub _execute_query {
 
     my $result = _apply($function, @values);
 
-Apply a computational function to values to produce a computed field value.
+Apply a computational function to values to produce a computed field value. This method processes derived
+fields, and uses internal field names only.
 
 =over 4
 
@@ -2027,9 +2064,10 @@ sub _ec_parse {
 
 =head3 _select_list
 
-    my $fieldList = _select_list($object, $cols);
+    my $fieldList = _select_list($p3, $object, $cols);
 
 Compute the list of fields required to retrieve the specified columns. This includes the specified normal fields plus any derived fields.
+Since the input is a column name list, the column names are pre-translated and must be converted into internal field names.
 
 =over 4
 
@@ -2050,12 +2088,13 @@ Returns a reference to a list of field names to retrieve.
 =cut
 
 sub _select_list {
-    my ($object, $cols) = @_;
+    my ($p3, $object, $cols) = @_;
     # The field names will be accumulated in here.
     my %retVal;
     # Get the modified-field hashes.
     my $derivedH = DERIVED->{$object};
     my $relatedH = RELATED->{$object};
+    ## TODO translate the column names if there is a P3View
     # Loop through the field names.
     for my $col (@$cols) {
         my $algorithm = $relatedH->{$col};
