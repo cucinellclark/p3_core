@@ -799,7 +799,7 @@ sub select_clause {
     } else {
         if (! $attrList) {
             if ($idFlag) {
-                $attrList = IDCOL->{$object};
+                $attrList = [IDCOL->{$object}];
             } elsif ($default) {
                 $attrList = $default;
             } else {
