@@ -949,6 +949,10 @@ sub get_data {
         # Here we need to loop through the couplets one at a time.
         for my $couplet (@$couplets) {
             my ($key, $row) = @$couplet;
+            # Verify there are no wild cards in the key value.
+            if ($key =~ /\*/) {
+                die "Cannot specify a wild card (*) in a key value.";
+            }
             # Create the final filter.
             my $keyField = ['eq', $fieldName, clean_value($key)];
             # Make the query.
@@ -1025,6 +1029,10 @@ sub get_data_batch {
     my @keys = grep { $_ ne '' } map { clean_value($_->[0]) } @$couplets;
     # Only proceed if we have at least one key.
     if (scalar @keys) {
+        # Insure there are no wildcards in the keys.
+        if (grep { $_ =~ /\*/ } @keys) {
+            die "No wildcards (*) allowed in key fields.";
+        }
         # Create a filter for the keys.
         my $keyClause = [in => $keyField, '(' . join(',', @keys) . ')'];
         # Next we run the query and process it into rows.
@@ -1114,6 +1122,10 @@ sub get_data_keyed {
     }
     my $computed = _select_list($p3, $object, $cols);
     my @mods = (['select', @keyList, @$computed], @$filter);
+    # Verify there are no wild cards in the keys.
+    if (grep { $_ =~ /\*/ } @$keys) {
+        die "Cannot specify a wild card (*) in a key value.";
+    }
     # Create a filter for the keys.  We loop through the keys, a group at a time.
     my $n = @$keys;
     for (my $i = 0; $i < @$keys; $i += 200) {

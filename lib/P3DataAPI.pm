@@ -76,7 +76,7 @@ if (my $f = $ENV{P3_DATA_API_LOGFILE})
 eval { require FIG_Config; };
 
 our $default_url = $FIG_Config::p3_data_api_url
-  || "https://alpha.bv-brc.org/api";
+  || "https://www.bv-brc.org/api";
 
 our %family_field_of_type = (plfam => "plfam_id",
                              pgfam => "pgfam_id",
@@ -465,11 +465,11 @@ sub submit_query {
     # print STDERR "content = $q\n";
     # $self->_log("Submitting to $core: $q\n");
     my $t1 = gettimeofday;
-        my $response = $ua->post($url,
+    my $response = $ua->post($url,
                              Accept => "application/json",
                              $self->auth_header,
                              Content => $q,
-                        );
+                            );
     # $self->_log("Response received from $core.\n");
     my $t2 = gettimeofday;
     if ($g_log_fh)
