@@ -404,7 +404,8 @@ sub query
 }
 
 #
-# Submit a raw data api query.
+# Submit a raw data api query. This method takes the actual query clauses as input instead
+# of the lists that get parsed and reformatted.
 sub raw_query
 {
     my ( $self, $core, @query ) = @_;
@@ -418,7 +419,7 @@ sub raw_query
 
     my @result;
     while ( !$done ) {
-    my $q   = join("&", "limit($chunk,$start)", @query);
+        my $q   = join("&", "limit($chunk,$start)", @query);
 
         #       print STDERR "Qry $url '$q'\n";
         #	my $resp = $ua->post($url,
@@ -427,7 +428,7 @@ sub raw_query
         my $end;
         # Form url-encoding
         if (! $self->{raw}) {
-        $q = $self->url_encode($q);
+            $q = $self->url_encode($q);
         }
         $q =~ s/ /+/g;
         # POST query - we retry 5 times after error
@@ -533,7 +534,7 @@ A code reference which will be invoked for each chunk of data returned from the 
 The callback is invoked with two parameters: an array reference containing the data returned, and a
 hash reference containing the following metadata about the lookup:
 
-=over 4
+=over 8
 
 =item start
 
@@ -636,7 +637,7 @@ sub query_cb {
             my $next       = $2;
             my $count      = $3;
 
-            my $last_call = $next >= $count;
+            my $last_call = ($next >= $count ? 1 : 0);
 
             my $continue = $cb_add->($data,
                          {
