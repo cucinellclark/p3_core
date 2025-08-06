@@ -28,10 +28,22 @@ package P3Utils;
     use SeedUtils;
     use Digest::MD5;
     use RoleParse;
+    use P3View;
 
 =head1 PATRIC Script Utilities
 
 This module contains shared utilities for PATRIC 3 scripts.
+
+The bulk of this module is concerned with presenting a model for using the PATRIC database. The model is
+defined by various constants that translate table and field names to more user-friendly versions and
+present derived fields.
+
+This process is complicated by the existence of views. A set of field names can be translated (post-view) or
+untranslated (pre-view). Every method that deals with field names must be aware of whether it is translated
+or not. The L<P3View> object that manages the translations is kept in the L<P3DataAPI> object that is passed
+to most methods. In general, column names and header lists are always untranslated. The major translators
+are L<P3Utils::select_clause> and L<P3Utils::form_filter>, which take untranslated (pre-view) names as input
+and produce translated names on the output.
 
 =head2 Constants
 
@@ -62,6 +74,8 @@ use constant OBJECTS => {   genome => 'genome',
                             protein_structure => 'protein_structure',
                             surveillance => 'surveillance',
                             serology => 'serology',
+                            sf => 'sequence_feature',
+                            sfvt => 'sequence_feature_vt'
 };
 
 =head3 FIELDS
@@ -97,6 +111,8 @@ use constant FIELDS =>  {   genome => ['genome_name', 'genome_id', 'genome_statu
                             serology => ['sample_identifier', 'host_identifier', 'host_type', 'host_species', 'host_common_name',
                                             'host_sex', 'host_age', 'host_age_group', 'host_health', 'collection_date', 'test_type', 'test_result',
                                             'serotype'],
+                            sf => ['sf_id', 'sf_name', 'sf_category', 'gene', 'length', 'sf_category', 'start', 'end', 'source_strain' ],
+                            sfvt => ['sf_id', 'sf_name', 'sf_category', 'sfvt_id', 'sfvt_genome_count', 'sfvt_sequence'],
 };
 
 =head3 IDCOL
@@ -124,6 +140,8 @@ use constant IDCOL =>   {   genome => 'genome_id',
                             protein_structure => 'pdb_id',
                             surveillance => 'sample_identifier',
                             serology => 'sample_identifier',
+                            sf => 'sf_id',
+                            sfvt => 'id'
                         };
 
 =head3 DERIVED
@@ -284,6 +302,15 @@ text search against entire records.
 
 Display debugging information on STDERR.
 
+=item limit
+
+Specify the maximum number of records to return. (The default is all records.) This is the maximum returned from
+the database, for performance reasons. The number of records actually returned may be substantially lower.
+
+=item view
+
+Specify the name of a L<P3View> file to use for translating field names.
+
 =back
 
 =cut
@@ -301,6 +328,8 @@ sub data_options {
             ['keyword=s', 'if specified, a keyword or phrase that shoould be in at least one field of every record'],
             ['required|r=s@', 'field(s) required to have values'],
             ['debug', 'display debugging on STDERR'],
+            ['limit=i', 'maximum number of results to return'],
+            ['view=s', 'name of P3View file to use for translating field names'],
             delim_options());
 }
 
@@ -518,6 +547,8 @@ sub get_col {
     my ($outHeaders, $keyCol) = P3Utils::process_headers($ih, $opt, $keyless);
 
 Read the header line from a tab-delimited input, format the output headers and compute the index of the key column.
+Note that this entire process is performed on untranslated (pre-view) field names. The key column is specified
+by a parameter in the options, so it is also untranslated.
 
 =over 4
 
@@ -570,7 +601,8 @@ sub process_headers {
     my $keyCol = P3Utils::find_column($col, \@headers, $optional);
 
 Determine the correct (0-based) index of the key column in a file from a column specifier and the headers.
-The column specifier can be a 1-based index or the name of a header.
+The column specifier can be a 1-based index or the name of a header. Since the header is always untranslated
+(pre-view), the key column name must be, too.
 
 =over 4
 
@@ -623,11 +655,16 @@ sub find_column {
 
 =head3 form_filter
 
-    my $filterList = P3Utils::form_filter($opt);
+    my $filterList = P3Utils::form_filter($p3, $opt);
 
-Compute the filter list for the specified options.
+Compute the filter list for the specified options. Note that the options specify untranslated (pre-view) column names,
+but the filter must be built using translated (internal) column names.
 
 =over 4
+
+=item p3
+
+A L<P3DataAPI> object used to access PATRIC. This is used to apply the P3View, if any.
 
 =item opt
 
@@ -642,7 +679,7 @@ Returns a reference to a list of filter specifications for a call to L<P3DataAPI
 =cut
 
 sub form_filter {
-    my ($opt) = @_;
+    my ($p3, $opt) = @_;
     # This will be the return list.
     my @retVal;
     # Get the relational operator constraints.
@@ -662,8 +699,10 @@ sub form_filter {
             } else {
                 die "Invalid --$op specification $opSpec.";
             }
+            # Convert the field name to internal format.
+            my $internalField = $p3->{view}->col_to_internal($field);
             # Apply the constraint.
-            push @retVal, [$op, $field, $value];
+            push @retVal, [$op, $internalField, $value];
         }
     }
     # Get the inclusion constraints.
@@ -701,7 +740,9 @@ sub form_filter {
     my ($selectList, $newHeaders) = P3Utils::select_clause($p3, $object, $opt, $idFlag, \@default);
 
 Determine the list of fields to be returned for the current query. If an C<--attr> option is present, its
-listed fields are used. Otherwise, a default list is used.
+listed fields are used. Otherwise, a default list is used. The default list is translated (internal names),
+but an explicit attribute list from the command-line options will be pre-view (untranslated names) and
+must be translated to form the select clause.
 
 =over 4
 
@@ -742,6 +783,9 @@ sub select_clause {
     # Validate the object.
     my $realName = OBJECTS->{$object};
     die "Invalid object $object." if (! $realName);
+    # Here we need to load the P3View if there is one specified. If not, a null view is attached to the $p3
+    # automatically.
+    $p3->{view} = P3View->new($opt->view, $object);
     # Get the attribute option.
     my $attrList = $opt->attr;
     if ($opt->count) {
@@ -752,22 +796,27 @@ sub select_clause {
             # Just return a count header.
             $attrList = ['count'];
         }
-    } elsif (! $attrList) {
-        if ($idFlag) {
-            $attrList = [IDCOL->{$object}];
-        } elsif ($default) {
-            $attrList = $default;
-        } else {
-            $attrList = FIELDS->{$object};
-        }
     } else {
-        # Handle comma-splicing.
-        $attrList = [ map { split /,/, $_ } @$attrList ];
-        # If we need an ID field, be sure it's in there.
-        if ($idFlag) {
-            my $idCol = IDCOL->{$object};
-            if (! scalar(grep { $_ eq $idCol } @$attrList)) {
-                unshift @$attrList, $idCol;
+        if (! $attrList) {
+            if ($idFlag) {
+                $attrList = [IDCOL->{$object}];
+            } elsif ($default) {
+                $attrList = $default;
+            } else {
+                $attrList = FIELDS->{$object};
+            }
+            # Un-translate this attribute list so it is in pre-view format.
+            $attrList = $p3->{view}->internal_list_to_col($attrList);
+        } else {
+            # Compute the pre-view (untranslated) version of the ID field.
+            my $idCol = $p3->{view}->col_to_internal(IDCOL->{$object});      
+            # Handle comma-splicing.
+            $attrList = [ map { split /,/, $_ } @$attrList ];
+            # If we need an ID field, be sure it's in there.
+            if ($idFlag) {
+                if (! scalar(grep { $_ eq $idCol } @$attrList)) {
+                    unshift @$attrList, $idCol;
+                }
             }
         }
     }
@@ -776,11 +825,21 @@ sub select_clause {
     # Clear the attribute list if we are counting.
     if ($opt->count) {
         undef $attrList;
+    } else {
+        # Translate the attribute list here to internal.
+        $attrList = $p3->{view}->col_list_to_internal($attrList);
     }
     # Check for the debug option.
     if ($opt->debug) {
         $p3->debug_on(\*STDERR);
     }
+    # Check for a hard limit.
+    my $hardLimit = $opt->limit;
+    if (defined $hardLimit) {
+		$p3->set_limit($hardLimit);
+	} else {
+		$p3->clear_limit();
+	}
     # Return the results.
     return ($attrList, \@headers);
 }
@@ -813,6 +872,9 @@ sub clean_value {
     $value =~ s/^\s+//;
     $value =~ s/\s+$//;
     $value =~ s/'//;
+    if ($value =~ /^[^"].+\s/) {
+        $value = "\"$value\"";
+    }
     return $value;
 }
 
@@ -823,7 +885,7 @@ sub clean_value {
 
 Return all of the indicated fields for the indicated entity (object) with the specified constraints.
 It should be noted that this method is simply a less-general interface to L<P3DataAPI/query> that handles standard
-command-line script options for filtering.
+command-line script options for filtering. Everything passed to this method must use internal field names.
 
 =over 4
 
@@ -874,7 +936,7 @@ sub get_data {
     if (! $cols) {
         @selected = $idCol;
     } else {
-        my $computed = _select_list($object, $cols);
+        my $computed = _select_list($p3,$object, $cols);
         @selected = @$computed;
     }
     my @mods = (['select', @selected], @$filter);
@@ -887,6 +949,10 @@ sub get_data {
         # Here we need to loop through the couplets one at a time.
         for my $couplet (@$couplets) {
             my ($key, $row) = @$couplet;
+            # Verify there are no wild cards in the key value.
+            if ($key =~ /\*/) {
+                die "Cannot specify a wild card (*) in a key value.";
+            }
             # Create the final filter.
             my $keyField = ['eq', $fieldName, clean_value($key)];
             # Make the query.
@@ -905,7 +971,7 @@ sub get_data {
 
 Return all of the indicated fields for the indicated entity (object) with the specified constraints.
 This version differs from L</get_data> in that the couplet keys are matched to a true key field (the
-matches are exact).
+matches are exact).  Everything passed to this method must use internal field names.
 
 =over 4
 
@@ -957,12 +1023,16 @@ sub get_data_batch {
     if (! scalar(grep { $_ eq $keyField } @$cols)) {
         @keyList = ($keyField);
     }
-    my $computed = _select_list($object, $cols);
+    my $computed = _select_list($p3, $object, $cols);
     my @mods = (['select', @keyList, @$computed], @$filter);
     # Now get the list of key values. These are not cleaned, because we are doing exact matches.
-    my @keys = grep { $_ ne '' } map { $_->[0] } @$couplets;
+    my @keys = grep { $_ ne '' } map { clean_value($_->[0]) } @$couplets;
     # Only proceed if we have at least one key.
     if (scalar @keys) {
+        # Insure there are no wildcards in the keys.
+        if (grep { $_ =~ /\*/ } @keys) {
+            die "No wildcards (*) allowed in key fields.";
+        }
         # Create a filter for the keys.
         my $keyClause = [in => $keyField, '(' . join(',', @keys) . ')'];
         # Next we run the query and process it into rows.
@@ -1000,6 +1070,7 @@ sub get_data_batch {
 
 Return all of the indicated fields for the indicated entity (object) with the specified constraints.
 The query is by key, and the keys are split into batches to prevent PATRIC from overloading.
+Everything passed to this method must use internal field names.
 
 =over 4
 
@@ -1049,8 +1120,12 @@ sub get_data_keyed {
     if (! scalar(grep { $_ eq $keyField } @$cols)) {
         @keyList = ($keyField);
     }
-    my $computed = _select_list($object, $cols);
+    my $computed = _select_list($p3, $object, $cols);
     my @mods = (['select', @keyList, @$computed], @$filter);
+    # Verify there are no wild cards in the keys.
+    if (grep { $_ =~ /\*/ } @$keys) {
+        die "Cannot specify a wild card (*) in a key value.";
+    }
     # Create a filter for the keys.  We loop through the keys, a group at a time.
     my $n = @$keys;
     for (my $i = 0; $i < @$keys; $i += 200) {
@@ -1434,7 +1509,8 @@ sub protein_fasta {
     my (\@headers, \@cols) = P3Utils::find_headers($ih, $fileType => @fields);
 
 Search the headers of the specified input file for the named fields and return the list of headers plus a list of
-the column indices for the named fields.
+the column indices for the named fields. Since this method deals with headers, all the field names are untranslated
+(that is, pre-view, not internal).
 
 =over 4
 
@@ -1665,7 +1741,8 @@ sub list_object_fields {
 
     P3Utils::_process_entries($p3, $object, \@retList, \@entries, \@row, \@cols, $id, $keyField);
 
-Process the specified results from a PATRIC query and store them in the output list.
+Process the specified results from a PATRIC query and store them in the output list. It's worth
+noting that the column name list will have internal column names.
 
 =over 4
 
@@ -1868,7 +1945,8 @@ sub _related_field {
     P3Utils::_execute_query($p3, $core, $keyField, $dataField, \@keys, \%retHash, $multi);
 
 Execute a query to get the data values associated with a key. The mapping
-from keys to data values is added to the specified hash.
+from keys to data values is added to the specified hash. This method is used for processing
+related fields, and uses internal field names for everything.
 
 =over 4
 
@@ -1926,7 +2004,8 @@ sub _execute_query {
 
     my $result = _apply($function, @values);
 
-Apply a computational function to values to produce a computed field value.
+Apply a computational function to values to produce a computed field value. This method processes derived
+fields, and uses internal field names only.
 
 =over 4
 
@@ -2005,9 +2084,10 @@ sub _ec_parse {
 
 =head3 _select_list
 
-    my $fieldList = _select_list($object, $cols);
+    my $fieldList = _select_list($p3, $object, $cols);
 
 Compute the list of fields required to retrieve the specified columns. This includes the specified normal fields plus any derived fields.
+The input list must contain internal column names.
 
 =over 4
 
@@ -2028,7 +2108,7 @@ Returns a reference to a list of field names to retrieve.
 =cut
 
 sub _select_list {
-    my ($object, $cols) = @_;
+    my ($p3, $object, $cols) = @_;
     # The field names will be accumulated in here.
     my %retVal;
     # Get the modified-field hashes.

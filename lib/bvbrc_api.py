@@ -75,7 +75,7 @@ def getFeatureDataFrame(genome_ids, session, limit=2500000):
                 line = line+'\n'
                 batch+=line
                 batch_count+=1        
-        # TODO: set column data types
+        # XXX: set column data types
         if batch == '':
             continue
         feature_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype=dtype_dict)
@@ -146,7 +146,7 @@ def getPathwayDataFrame(genome_ids,session,limit=2500000):
                 line = line+'\n'
                 batch+=line
                 batch_count+=1 
-        # TODO: set column data types
+        # XXX: set column data types
         if batch == '':
             continue
         pathway_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'genome_id':str,'pathway_id':str})
@@ -291,7 +291,7 @@ def getDataForGenomes(genomeIdSet, Session):
                 line = line+'\n'
                 batch+=line
                 batch_count+=1 
-        # TODO: rename columns
+        # XXX: rename columns
         if batch == '':
             continue 
         genomes_df = pd.read_csv(io.StringIO(batch),sep='\t',dtype={'Genome ID':str})
