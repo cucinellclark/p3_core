@@ -1781,7 +1781,7 @@ sub retrieve_rna_features_in_genomes_to_temp {
             },
                         [ "eq",     "genome_id", $gid ],
                         [ "eq", "patric_id", "*"],
-            [ "eq", "feature_type", "*rna"],
+            [ "in", "feature_type", "(*rna,*RNA)"],
                         [ "select", "patric_id,na_sequence_md5" ],
         );
     }
