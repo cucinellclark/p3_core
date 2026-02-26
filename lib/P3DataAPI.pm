@@ -3,6 +3,7 @@ package P3DataAPI;
 # This is a SAS Component
 
 # Updated for new PATRIC.
+use Carp::Always;
 
 use File::Temp qw(:seekable);
 use LWP::UserAgent;
@@ -13,9 +14,22 @@ use gjoseqlib;
 use URI::Escape;
 use Digest::MD5 'md5_hex';
 use Time::HiRes 'gettimeofday';
-use DBI;
+
+our $have_dbi;
+eval {
+    require DBI;
+    $have_dbi = 1;
+};
+
 use HTTP::Request::Common;
 use Data::Dumper;
+
+our $have_workspace;
+eval {
+    require Bio::P3::Workspace::WorkspaceClientExt;
+    $have_workspace = 1;
+};
+
 eval {
     require IPC::Run;
 };
@@ -62,7 +76,7 @@ if (my $f = $ENV{P3_DATA_API_LOGFILE})
 eval { require FIG_Config; };
 
 our $default_url = $FIG_Config::p3_data_api_url
-  || "https://p3.theseed.org/services/data_api";
+  || "https://www.bv-brc.org/api";
 
 our %family_field_of_type = (plfam => "plfam_id",
                              pgfam => "pgfam_id",
@@ -99,7 +113,7 @@ __PACKAGE__->mk_accessors(qw(benchmark chunk_size url ua reference_genome_cache
                              debug redis
                             ));
 
-our %EncodeMap = ('<' => '%60', '=' => '%61', '>' => '%62', '"' => '%34', '#' => '%35', '%' => '%37',
+our %EncodeMap = ('<' => '%60', '=' => '%61', '>' => '%62', '"' => '%22', '#' => '%35', '%' => '%37',
                   '+' => '%43', '/' => '%47', ':' => '%3A', '{' => '%7B', '|' => '%7C', '}' => '%7D',
                   '^' => '%94', '`' => '%96', '&' => '%26', "'" => '%27');
 
@@ -138,6 +152,7 @@ sub new {
     my $self = {
         url        => $url,
         chunk_size => 25000,
+        limit 	   => undef,
         ua         => LWP::UserAgent->new(),
         token      => $token,
         benchmark  => 0,
@@ -168,7 +183,7 @@ sub new {
             warn "Redis requested but Redis::Client not available in this perl environment";
         }
     }
-
+# print STDERR "DATA API $self->{url} FC=$FIG_Config::p3_data_api_url\n";
     return bless $self, $class;
 }
 
@@ -200,6 +215,41 @@ TRUE to turn on raw mode; FALSE to turn it off.
 sub set_raw {
     my ($self, $mode) = @_;
     $self->{raw} = $mode;
+}
+
+=head3 set_limit
+
+	$d->set_limit($new_limit);
+
+Set the return limit. If this parameter has a defined value, it places a hard limit on the number of results
+returned, and any results returned decrement the limit. Use L<clear_limit> to turn this feature off.
+
+=over 4
+
+=item new_limit
+
+New result-limit value to save.
+
+=back
+
+=cut
+
+sub set_limit {
+	my ($self, $new_limit) = @_;
+	$self->{limit} = $new_limit;
+}
+
+=head3 clear_limit
+
+	$d->clear_limit();
+
+Turn off the result-limiting feature.
+
+=cut
+
+sub clear_limit {
+	my ($self) = @_;
+	$self->{limit} = undef;
 }
 
 =head3 query
@@ -288,53 +338,74 @@ sub query
     my $start = 0;
 
     my @result;
-    while ( !$done ) {
+    while ( !$done) {
         my $lim;
-        if (! $limitFound) {
-            $lim = "limit($chunk,$start)";
-        } else {
-            $lim = "limit($limitFound,0)";
-            $done = 1;
-        }
-	my $q   = "$qstr&$lim";
+        # Compute the limit clause. A coded limit overrides everything. Otherwise, the hard limit is
+        # checked. The maximum limit is the chunk size. If $start is nonzero, then we are getting
+        # a chunk on a secondary call. If the hard limit is zero, we are done.
+        if (defined $self->{limit} && $self->{limit} <= 0) {
+			$done = 1;
+		} else {
+	        if ($limitFound) {
+				# Here we have a limit override.
+				$lim = "limit($limitFound,0)";
+				$done = 1;
+			} elsif (! defined $self->{limit}) {
+				# No hard limit, so get a chunk.
+				$lim = "limit($chunk,$start)";
+			} else {
+				# Here we have a hard limit. This could reduce the chunk size.
+				my $computed_lim = $chunk;
+				if ($computed_lim > $self->{limit}) {
+					$computed_lim = $self->{limit};
+				}
+				$lim = "limit($computed_lim,$start)";
+			}
+		    my $q   = "$qstr&$lim";
 
-        #       print STDERR "Qry $url '$q'\n";
-        #	my $resp = $ua->post($url,
-        #			     Accept => "application/json",
-        #			     Content => $q);
-        my $end;
-        # Form url-encoding
-        if (! $self->{raw}) {
-        $q = $self->url_encode($q);
-        }
-        $q =~ s/ /+/g;
-        # POST query - we retry 5 times after error
-        my ($resp, $data) = $self->submit_query($core, $q);
-        # print STDERR $resp->content;
+	        #       print STDERR "Qry $url '$q'\n";
+	        #	my $resp = $ua->post($url,
+	        #			     Accept => "application/json",
+	        #			     Content => $q);
+	        my $end;
+	        # Form url-encoding
+	        if (! $self->{raw}) {
+	            $q = $self->url_encode($q);
+	        }
+	        $q =~ s/ /%20/g;
+	        # POST query - we retry 5 times after error
+	        my ($resp, $data) = $self->submit_query($core, $q);
+	        # print STDERR $resp->content;
 
-        push @result, @$data;
+	        push @result, @$data;
+	        # Update the hard limit, if needed.
+	        if (defined $self->{limit}) {
+				$self->{limit} -= scalar @$data;
+			}
 
-        #        print STDERR scalar(@$data) . " results found.\n";
-        my $r = $resp->header('content-range');
-
-        #	print "r=$r\n";
-        if ( $r =~ m,items\s+(\d+)-(\d+)/(\d+), ) {
-            my $this_start = $1;
-            my $next       = $2;
-            my $count      = $3;
-            if (! $started && $count >= 500) {
-                # $self->_log("$count results expected.\n");
-                $started = 1;
-            }
-            last if ( $next >= $count );
-            $start = $next;
-        }
+	        #        print STDERR scalar(@$data) . " results found.\n";
+	        # Do the chunking here. We use the content range to figure out
+	        # if another chunk is needed.
+	        my $r = $resp->header('content-range');
+	        #	print "r=$r\n";
+	        if ( $r =~ m,items\s+(\d+)-(\d+)/(\d+), ) {
+	            my $this_start = $1;
+	            my $next       = $2;
+	            my $count      = $3;
+	            if (! $started && $count >= 500) {
+	                $started = 1;
+	            }
+	            last if ( $next >= $count );
+	            $start = $next;
+	        }
+		}
     }
     return @result;
 }
 
 #
-# Submit a raw data api query.
+# Submit a raw data api query. This method takes the actual query clauses as input instead
+# of the lists that get parsed and reformatted.
 sub raw_query
 {
     my ( $self, $core, @query ) = @_;
@@ -348,7 +419,7 @@ sub raw_query
 
     my @result;
     while ( !$done ) {
-	my $q   = join("&", "limit($chunk,$start)", @query);
+        my $q   = join("&", "limit($chunk,$start)", @query);
 
         #       print STDERR "Qry $url '$q'\n";
         #	my $resp = $ua->post($url,
@@ -357,7 +428,7 @@ sub raw_query
         my $end;
         # Form url-encoding
         if (! $self->{raw}) {
-	    $q = $self->url_encode($q);
+            $q = $self->url_encode($q);
         }
         $q =~ s/ /+/g;
         # POST query - we retry 5 times after error
@@ -369,7 +440,7 @@ sub raw_query
         #        print STDERR scalar(@$data) . " results found.\n";
         my $r = $resp->header('content-range');
 
-        	print "r=$r\n";
+            print "r=$r\n";
         if ( $r =~ m,items\s+(\d+)-(\d+)/(\d+), ) {
             my $this_start = $1;
             my $next       = $2;
@@ -392,21 +463,23 @@ sub submit_query {
     my ($resp, $data);
     my $tries = 0;
     while (! $resp) {
-	# print STDERR "content = $q\n";
-	my $t1 = gettimeofday;
-        my $response = $ua->post($url,
+    # print STDERR "content = $q\n";
+    # $self->_log("Submitting to $core: $q\n");
+    my $t1 = gettimeofday;
+    my $response = $ua->post($url,
                              Accept => "application/json",
                              $self->auth_header,
                              Content => $q,
-                        );
-	my $t2 = gettimeofday;
-	if ($g_log_fh)
-	{
-	    my $elap = $t2 - $t1;
-	    my $ms = int(1000 * ($t1 - int($t1)));
-	    print $g_log_fh strftime("%Y-%m-%d %H:%M:%S", localtime $t1) . sprintf(".%03d %.3f", $ms, $elap) . " " . $response->code . " $$ $core " . $response->header("Content-Length") . "\n";
-	}
-	# print STDERR Dumper($response);
+                            );
+    # $self->_log("Response received from $core.\n");
+    my $t2 = gettimeofday;
+    if ($g_log_fh)
+    {
+        my $elap = $t2 - $t1;
+        my $ms = int(1000 * ($t1 - int($t1)));
+        print $g_log_fh strftime("%Y-%m-%d %H:%M:%S", localtime $t1) . sprintf(".%03d %.3f", $ms, $elap) . " " . $response->code . " $$ $core " . $response->header("Content-Length") . "\n";
+    }
+    # print STDERR Dumper($response);
         my $error;
         if ( $response->is_success ) {
             eval {
@@ -425,10 +498,10 @@ sub submit_query {
             if ($tries >= 15) {
                 die "Failing after $tries tries: $error";
             } else {
-        if ($g_log_fh)
-        {
-            print $g_log_fh "ERROR: " . substr($error, 0, 200) . "\n";
-        }
+                if ($g_log_fh)
+                {
+                    print $g_log_fh "ERROR: " . substr($error, 0, 200) . "\n";
+                }
                 my $qabbrv = substr($q, 0, 500) . (length($q) > 500 ? '...' : "");
                 $self->_log("Retrying $qabbrv\n");
                 $tries++;
@@ -461,7 +534,7 @@ A code reference which will be invoked for each chunk of data returned from the 
 The callback is invoked with two parameters: an array reference containing the data returned, and a
 hash reference containing the following metadata about the lookup:
 
-=over 4
+=over 8
 
 =item start
 
@@ -564,7 +637,7 @@ sub query_cb {
             my $next       = $2;
             my $count      = $3;
 
-            my $last_call = $next >= $count;
+            my $last_call = ($next >= $count ? 1 : 0);
 
             my $continue = $cb_add->($data,
                          {
@@ -656,9 +729,9 @@ sub solr_query_raw_list
 
     my $res = $self->ua->post($uri,
                               $params,
-			      "Content-type" => "application/solrquery+x-www-form-urlencoded",
-			      "Accept", "application/solr+json",
-			      $self->auth_header,
+                  "Content-type" => "application/solrquery+x-www-form-urlencoded",
+                  "Accept", "application/solr+json",
+                  $self->auth_header,
                             );
     if ($self->debug)
     {
@@ -693,40 +766,40 @@ sub solr_query_raw_multi
         my $uri = URI->new($self->url . "/$core");
 
         my @params = (start => 0, rows => 25000);
-	if (ref($params) eq 'ARRAY')
-	{
-	    for my $ent (@$params)
-	    {
-		my($k, $v) = @$ent;
-		if (ref($v) eq 'ARRAY')
-		{
-		    $v = join(",", @$v);
-		}
-		push(@params, $k, $v);
-	    }
-	}
-	else
-	{
-	    while (my($k, $v) = each %$params)
-	    {
-		if (ref($v) eq 'ARRAY')
-		{
-		    $v = join(",", @$v);
-		}
-		push(@params, $k, $v);
-	    }
-	}
+    if (ref($params) eq 'ARRAY')
+    {
+        for my $ent (@$params)
+        {
+        my($k, $v) = @$ent;
+        if (ref($v) eq 'ARRAY')
+        {
+            $v = join(",", @$v);
+        }
+        push(@params, $k, $v);
+        }
+    }
+    else
+    {
+        while (my($k, $v) = each %$params)
+        {
+        if (ref($v) eq 'ARRAY')
+        {
+            $v = join(",", @$v);
+        }
+        push(@params, $k, $v);
+        }
+    }
 
-	# print Dumper(PARAMS => @params);
+    # print Dumper(PARAMS => @params);
         $uri->query_form(\@params);
 
-	# print STDERR "Query url: $uri\n";
-	
+    # print STDERR "Query url: $uri\n";
+
         my $req = POST($self->url . "/$core",
-				  "Content-type" => "application/solrquery+x-www-form-urlencoded",
-				  "Accept", "application/solr+json",
-				  $self->auth_header,
-				  "Content" => $uri->query);
+                  "Content-type" => "application/solrquery+x-www-form-urlencoded",
+                  "Accept", "application/solr+json",
+                  $self->auth_header,
+                  "Content" => $uri->query);
 
         my $id = $async->add($req);
         $resmap{$id} = $i;
@@ -828,14 +901,14 @@ sub solr_query_list
 
         # print STDERR "ndocs=$ndocs $n=$n nfound=$resp->{numFound}\n";
 
-	if (ref($cb))
-	{
-	    push(@out, $cb->($doc));
-	}
-	else
-	{
-	    push(@out, @{$resp->{docs}});
-	}
+    if (ref($cb))
+    {
+        push(@out, $cb->($doc));
+    }
+    else
+    {
+        push(@out, @{$resp->{docs}});
+    }
 
         $start += $ndocs;
         last if (defined($max_count) && $n >= $max_count) || $n >= $resp->{numFound};
@@ -919,7 +992,7 @@ sub lookup_sequence_data
 {
     my($self, $ids, $cb) = @_;
 
-    my $batchsize = 500;
+    my $batchsize = 5000;
     my @goodIds = grep { $_ } @$ids;
     my $n = @goodIds;
     my $end;
@@ -1065,20 +1138,76 @@ sub retrieve_protein_features_in_genomes {
 sub retrieve_patricids_from_feature_group {
     my ( $self, $feature_group_path) = @_;
 
-    my @names = ();
-    $self->query_cb("genome_feature",
-                    sub {
-                        my ($data) = @_;
-            push @names, grep { $_ } map { $_->{patric_id} } @$data;
-                        #for my $ent (@$data) {
-            #push @names, $ent->{patric_id};
-                        #}
-                        return 1;
-                    },
-                    [ "in",     "feature_id", "FeatureGroup(" . uri_escape($feature_group_path) . ")"],
-            ['select', 'patric_id,feature_id']
-                   );
-    return \@names
+    if ($have_workspace)
+    {
+	my $ws = Bio::P3::Workspace::WorkspaceClientExt->new();
+
+	my $raw_group = $ws->get({ objects => [$feature_group_path] });
+	my($meta, $data_txt) = @{$raw_group->[0]};
+	my $data = decode_json($data_txt);
+	my $list = $data->{id_list}->{feature_id};
+
+	my @members = @$list;
+	my @out;
+	while (@members)
+	{
+	    my @chunk = splice(@members, 0, 500);
+	    my $qry = join(" OR ", map { "\"$_\"" } @chunk);
+	    my $res = $self->solr_query("genome_feature", { q => "feature_id:($qry)", fl => "feature_id,patric_id" });
+	    push(@out, map { $_->{patric_id} } @$res);
+	}
+	return \@out;
+    }
+    else
+    {
+	my @names = ();
+	$self->query_cb("genome_feature",
+			sub {
+			    my ($data) = @_;
+			    push @names, grep { $_ } map { $_->{patric_id} } @$data;
+			    #for my $ent (@$data) {
+			    #push @names, $ent->{patric_id};
+			    #}
+			    return 1;
+			},
+			[ "in",     "feature_id", "FeatureGroup(" . uri_escape($feature_group_path) . ")"],
+			['select', 'patric_id,feature_id']
+		       );
+	return \@names
+    }
+}
+
+sub retrieve_feature_ids_from_feature_group {
+    my ( $self, $feature_group_path) = @_;
+
+    if ($have_workspace)
+    {
+	my $ws = Bio::P3::Workspace::WorkspaceClientExt->new();
+
+	my $raw_group = $ws->get({ objects => [$feature_group_path] });
+	my($meta, $data_txt) = @{$raw_group->[0]};
+	my $data = decode_json($data_txt);
+	my $list = $data->{id_list}->{feature_id};
+
+	return $list;
+    }
+    else
+    {
+	my @names = ();
+	$self->query_cb("genome_feature",
+			sub {
+			    my ($data) = @_;
+			    push @names, grep { $_ } map { $_->{feature_id} } @$data;
+			    #for my $ent (@$data) {
+			    #push @names, $ent->{patric_id};
+			    #}
+			    return 1;
+			},
+			[ "in",     "feature_id", "FeatureGroup(" . uri_escape($feature_group_path) . ")"],
+			['select', 'feature_id']
+		       );
+	return \@names
+    }
 }
 
 sub retrieve_protein_sequences_from_feature_group {
@@ -1149,16 +1278,29 @@ sub retrieve_patric_ids_from_genome_group {
     return \@names
 }
 
+#
+# $use_feature_id true if we wish to match feature_id instead of patric_id
+#
 sub retrieve_protein_feature_sequence {
-    my ( $self, $fids) = @_;
+    my ( $self, $fids, $use_feature_id) = @_;
 
     my %map;
 
     #
     # Query for features.
     #
+    # Block the query into 500 id chunks to mitigate Solr timeouts.
+    #
 
-    $self->query_cb("genome_feature",
+    my @todo = @$fids;
+
+    my $id_field = $use_feature_id ? "feature_id" : "patric_id";
+
+    while (@todo)
+    {
+	my(@chunk) = splice(@todo, 0, 5000);
+
+	$self->query_cb("genome_feature",
                     sub {
                         my ($data) = @_;
                         for my $ent (@$data) {
@@ -1168,9 +1310,10 @@ sub retrieve_protein_feature_sequence {
                         return 1;
                     },
                     [ "in",     "feature_type", "(mat_peptide,CDS)" ],
-                    [ "in",     "patric_id", "(" . join(",", map { uri_escape($_) } @$fids) . ")"],
+                    [ "in",     $id_field, "(" . join(",", map { uri_escape($_) } @chunk) . ")"],
                     [ "select", "patric_id,aa_sequence_md5" ],
-                   );
+		       );
+    }
 
     #
     # Query for sequences.
@@ -1186,12 +1329,17 @@ sub retrieve_protein_feature_sequence {
     return \%out;
 }
 
+#
+# $use_feature_id true if we wish to match feature_id instead of patric_id
+#
 sub retrieve_nucleotide_feature_sequence {
-    my ( $self, $fids) = @_;
+    my ( $self, $fids, $use_feature_id) = @_;
 
     my %map;
 
     return {} if @$fids == 0;
+
+    my $id_field = $use_feature_id ? "feature_id" : "patric_id";
 
     #
     # Query for features.
@@ -1206,7 +1354,7 @@ sub retrieve_nucleotide_feature_sequence {
                         }
                         return 1;
                     },
-                    [ "in",     "patric_id", "(" . join(",", map { uri_escape($_) } @$fids) . ")"],
+                    [ "in",     $id_field, "(" . join(",", map { uri_escape($_) } @$fids) . ")"],
                     [ "select", "patric_id,na_sequence_md5" ],
                    );
 
@@ -1276,11 +1424,11 @@ sub retrieve_features_in_feature_group_in_export_format
 
     my $md5_type;
     if (lc($feature_type) eq 'aa') {
-	$md5_type = 'aa_sequence_md5';
+    $md5_type = 'aa_sequence_md5';
     } elsif (lc($feature_type) eq 'dna' || lc($feature_type) eq 'na') {
-	$md5_type = 'na_sequence_md5';
+    $md5_type = 'na_sequence_md5';
     } else {
-	die "retrieve_features_in_feature_group_in_export_format: Invalid feature type '$feature_type'\n";
+    die "retrieve_features_in_feature_group_in_export_format: Invalid feature type '$feature_type'\n";
     }
 
     my $on_feature =  sub {
@@ -1308,7 +1456,7 @@ sub retrieve_features_in_feature_group_in_export_format
 
     $self->query_cb("genome_feature",
                     $on_feature,
-		    [ "in",     "feature_id", "FeatureGroup(" . uri_escape($feature_group_path) . ")"],
+            [ "in",     "feature_id", "FeatureGroup(" . uri_escape($feature_group_path) . ")"],
                     [ "select", "patric_id,$md5_type,genome_name,product,genome_id" ],
                    );
 }
@@ -1633,7 +1781,7 @@ sub retrieve_rna_features_in_genomes_to_temp {
             },
                         [ "eq",     "genome_id", $gid ],
                         [ "eq", "patric_id", "*"],
-            [ "eq", "feature_type", "*rna"],
+            [ "in", "feature_type", "(*rna,*RNA)"],
                         [ "select", "patric_id,na_sequence_md5" ],
         );
     }
@@ -1664,19 +1812,19 @@ sub retrieve_rna_features_in_genomes_to_temp {
 sub compare_regions_for_peg_new
 {
     my($self, $peg, $width, $n_genomes, $coloring_method, $context) = @_;
-    
+
     $coloring_method = 'pgfam' unless $family_field_of_type{$coloring_method};
     my $coloring_field = $family_field_of_type{$coloring_method};
-    
+
     my $fids;
     print STDERR "compare_regions_for_peg: context=$context\n";
-    
+
     if (!$context)
     {
-	#	$context = ['group', 'pheS.3.0-1.1'];
-	#	$coloring_field = 'group_family';
+    #	$context = ['group', 'pheS.3.0-1.1'];
+    #	$coloring_field = 'group_family';
     }
-    
+
     my $group_data;
     if (ref($context) eq 'ARRAY')
     {
@@ -1684,7 +1832,7 @@ sub compare_regions_for_peg_new
         {
             my $group = $context->[1];
             $fids = $self->compute_pin_features_for_group($group, $peg, $n_genomes);
-	    
+
             #
             # Hack - side effect of compute_pin_features_for_group is to fill the cache
             #
@@ -1699,25 +1847,25 @@ sub compare_regions_for_peg_new
     {
         $fids = $self->compute_pin_features_by_family_lookup($peg, $n_genomes);
     }
-    
+
     my $colored;
     eval {
-	
-	my @p = $self->expand_fids_to_pin($fids, [$coloring_field]);
-	
-	my @q = $self->compute_pin_alignment(\@p, $n_genomes);
-	# print Dumper(\@q);
-	my($regions, $all_features) = $self->expand_pin_to_regions(\@q, $width, $group_data);
-	# print Dumper($regions, $all_features);
-	
-	my($key_feature) = grep { $_->{fid} eq $peg } @{$regions->[0]->{features}};
-	my $key_coloring_val = $key_feature->{$coloring_field};
-	
-	$colored = $self->color_regions_by_field($regions, $all_features, $coloring_field, $key_coloring_val);
+
+    my @p = $self->expand_fids_to_pin($fids, [$coloring_field]);
+
+    my @q = $self->compute_pin_alignment(\@p, $n_genomes);
+    # print Dumper(\@q);
+    my($regions, $all_features) = $self->expand_pin_to_regions(\@q, $width, $group_data);
+    # print Dumper($regions, $all_features);
+
+    my($key_feature) = grep { $_->{fid} eq $peg } @{$regions->[0]->{features}};
+    my $key_coloring_val = $key_feature->{$coloring_field};
+
+    $colored = $self->color_regions_by_field($regions, $all_features, $coloring_field, $key_coloring_val);
     };
     if ($@)
     {
-	die "FAILURE: $@\n";
+    die "FAILURE: $@\n";
     }
     return $colored;
 }
@@ -1865,14 +2013,14 @@ sub color_regions_by_field
 sub compare_regions_for_peg
 {
     my($self, $peg, $width, $n_genomes, $coloring_method, $genome_filter_str, $params) = @_;
-    
+
     print Dumper($peg, $width, $n_genomes, $coloring_method, $genome_filter_str, $params);
-    
+
     $coloring_method = 'pgfam' unless $family_field_of_type{$coloring_method};
     my $coloring_field = $family_field_of_type{$coloring_method};
-    
+
     print STDERR "compare: $peg, $width, $n_genomes, $coloring_method, $genome_filter_str\n";
-    
+
     $genome_filter_str //= 'representative';
     my $genome_filter = sub { 1 };
     my $solr_filter;
@@ -1903,139 +2051,139 @@ sub compare_regions_for_peg
     }
     elsif ($genome_filter_str eq 'genome_list')
     {
-	my $genomes = $params->{genome_list};
-	ref($genomes) or die "Parameter genome_list missing\n";
-	my %genomes = map { $_ => 1 } @$genomes;
-	$genome_filter = sub { return exists $genomes{$_[0]} };
-	$solr_filter = "{!terms f=genome_id}" . join(",", @$genomes);
-	for my $i (0..$#$genomes)
-	{
-	    $gorder{$genomes->[$i]} = $i;
-	}
-	$gorder{genome_of($peg)} = -1;
-	$n_genomes = @$genomes;
+    my $genomes = $params->{genome_list};
+    ref($genomes) or die "Parameter genome_list missing\n";
+    my %genomes = map { $_ => 1 } @$genomes;
+    $genome_filter = sub { return exists $genomes{$_[0]} };
+    $solr_filter = "{!terms f=genome_id}" . join(",", @$genomes);
+    for my $i (0..$#$genomes)
+    {
+        $gorder{$genomes->[$i]} = $i;
+    }
+    $gorder{genome_of($peg)} = -1;
+    $n_genomes = @$genomes;
     }
     elsif ($genome_filter_str eq 'genome_group')
     {
-	my $group = $params->{genome_group};
-	$group or die "Parameter genome_group missing\n";
-	my $genomes = $self->retrieve_patric_ids_from_genome_group($group);
-	my %genomes = map { $_ => 1 } @$genomes;
-	$genome_filter = sub { return exists $genomes{$_[0]} };
-	$solr_filter = "{!terms f=genome_id}" . join(",", @$genomes);
-	for my $i (0..$#$genomes)
-	{
-	    $gorder{$genomes->[$i]} = $i;
-	}
-	$gorder{genome_of($peg)} = -1;
-	$n_genomes = @$genomes;
+    my $group = $params->{genome_group};
+    $group or die "Parameter genome_group missing\n";
+    my $genomes = $self->retrieve_patric_ids_from_genome_group($group);
+    my %genomes = map { $_ => 1 } @$genomes;
+    $genome_filter = sub { return exists $genomes{$_[0]} };
+    $solr_filter = "{!terms f=genome_id}" . join(",", @$genomes);
+    for my $i (0..$#$genomes)
+    {
+        $gorder{$genomes->[$i]} = $i;
+    }
+    $gorder{genome_of($peg)} = -1;
+    $n_genomes = @$genomes;
     }
     elsif ($genome_filter_str eq 'feature_group')
     {
-	#
-	# Feature groups are dealt with a little differently, since
-	# they replace the pin choice. We will need to look up the data
-	# that is found for the pin creation and replace the pin with that.
-	#
-	
-	my $group = $params->{feature_group};
-	$group or die "Parameter feature_group missing\n";
-	$features = $self->retrieve_patricids_from_feature_group($group);
-	
-	print Dumper(fgroup  => $group, $features);
-	
-	#
-	# We remove our focus peg from the features list so it is not duplicated.
-	#
-	@$features = grep { $_ ne $peg } @$features;
-	
-	for my $i (0..$#$features)
-	{
-	    $gorder{genome_of($features->[$i])} = $i;
-	}
-	$gorder{genome_of($peg)} = -1;
-	$n_genomes = @$features;
+    #
+    # Feature groups are dealt with a little differently, since
+    # they replace the pin choice. We will need to look up the data
+    # that is found for the pin creation and replace the pin with that.
+    #
+
+    my $group = $params->{feature_group};
+    $group or die "Parameter feature_group missing\n";
+    $features = $self->retrieve_patricids_from_feature_group($group);
+
+    print Dumper(fgroup  => $group, $features);
+
+    #
+    # We remove our focus peg from the features list so it is not duplicated.
+    #
+    @$features = grep { $_ ne $peg } @$features;
+
+    for my $i (0..$#$features)
+    {
+        $gorder{genome_of($features->[$i])} = $i;
+    }
+    $gorder{genome_of($peg)} = -1;
+    $n_genomes = @$features;
     }
     elsif ($genome_filter_str eq 'feature_query')
     {
-	#
-	# Use the given query to look up features. This also replaces the pin choice.
-	# Since the caller may not have a focus peg, if it is unset we'll use the
-	# first return from the query. There is an issue here regarding the
-	# order of results since the query doesn't ensure any order. 
-	#
-	
-	my $query = $params->{feature_query};
-	print STDERR "Q before: $query\n";
+    #
+    # Use the given query to look up features. This also replaces the pin choice.
+    # Since the caller may not have a focus peg, if it is unset we'll use the
+    # first return from the query. There is an issue here regarding the
+    # order of results since the query doesn't ensure any order.
+    #
+
+    my $query = $params->{feature_query};
+    print STDERR "Q before: $query\n";
 #	$query = uri_unescape($query);
-	print STDERR "Q after: $query\n";
-	#	$query or die "Parameter feature_query missing\n";
-	if ($query eq '')
-	{
-	    die "Feature query was given an empty query; this is not allowed.";
-	}
-	eval {
-	    local $self->{raw} = 1;
-	    $features = [map { $_->{patric_id} } $self->raw_query('genome_feature', $query, 'select(patric_id)', 'eq(patric_id,*)')];
-	};
-	if ($@)
-	{
-	    print STDERR "Q failure: $@";
-	}
-	# print STDERR Dumper(QUERY => $query, $features);
-	if (!$peg)
-	{
-	    $peg = pop @$features;
-	}
-	for my $i (0..$#$features)
-	{
-	    $gorder{genome_of($features->[$i])} = $i;
-	}
-	$gorder{genome_of($peg)} = -1;
-	$n_genomes = @$features;
-	# print Dumper($n_genomes, $features, \%gorder);
+    print STDERR "Q after: $query\n";
+    #	$query or die "Parameter feature_query missing\n";
+    if ($query eq '')
+    {
+        die "Feature query was given an empty query; this is not allowed.";
     }
-    
+    eval {
+        local $self->{raw} = 1;
+        $features = [map { $_->{patric_id} } $self->raw_query('genome_feature', $query, 'select(patric_id)', 'eq(patric_id,*)')];
+    };
+    if ($@)
+    {
+        print STDERR "Q failure: $@";
+    }
+    # print STDERR Dumper(QUERY => $query, $features);
+    if (!$peg)
+    {
+        $peg = pop @$features;
+    }
+    for my $i (0..$#$features)
+    {
+        $gorder{genome_of($features->[$i])} = $i;
+    }
+    $gorder{genome_of($peg)} = -1;
+    $n_genomes = @$features;
+    # print Dumper($n_genomes, $features, \%gorder);
+    }
+
     # print Dumper($genome_filter, $solr_filter);
-    
+
     my %seqs;
-    
+
     my @pin;
-    
+
     if ($features)
     {
-	@pin = $self->get_pin_from_features($peg, $features, \%seqs);
-	# print STDERR Dumper(PIN => \@pin);
+    @pin = $self->get_pin_from_features($peg, $features, \%seqs);
+    # print STDERR Dumper(PIN => \@pin);
     }
     else
     {
-	@pin = $self->get_pin($peg, $coloring_method, $n_genomes, $genome_filter, $solr_filter, \%seqs);
+    @pin = $self->get_pin($peg, $coloring_method, $n_genomes, $genome_filter, $solr_filter, \%seqs);
     }
-    
+
     if (%gorder)
     {
-	@pin = sort { $gorder{$a->{genome_id}} <=> $gorder{$b->{genome_id}} } @pin;
+    @pin = sort { $gorder{$a->{genome_id}} <=> $gorder{$b->{genome_id}} } @pin;
     }
     print STDERR "got pin size=" . scalar(@pin) . "\n";
     # print STDERR Dumper(\@pin);
     my $half_width = int($width / 2);
-    
+
     my @out;
     my @all_features;
-    
+
     my $set_1_fam;
-    
+
     my @genes_in_region_request;
     my @length_queries;
-    
+
     for my $pin_row (0..$#pin)
     {
         my $elt = $pin[$pin_row];
-	
-	#	my ($left, $right);
-	#	($left, $right) = $elt->{strand} eq '+' ? ($elt->{start}, $elt->{end}) : ($elt->{end}, $elt->{start});
-	#	my $mid = int(($left + $right) / 2);
-	
+
+    #	my ($left, $right);
+    #	($left, $right) = $elt->{strand} eq '+' ? ($elt->{start}, $elt->{end}) : ($elt->{end}, $elt->{start});
+    #	my $mid = int(($left + $right) / 2);
+
         my($ref_b,$ref_e, $ref_sz);
         if ($elt->{strand} eq '+')
         {
@@ -2059,11 +2207,11 @@ sub compare_regions_for_peg
     $contig_lengths{$_->{genome_id}, $_->{accession}} = $_->{length} foreach @$lengths;
     # $contig_lengths{$_->{genome_id}, $_->{sequence_id}} = $_->{length} foreach @$lengths;
     # print STDERR Dumper(GIR => \@length_queries, $lengths, \%contig_lengths, \@genes_in_region_request);
-    
+
     my @genes_in_region_response = $self->genes_in_region_bulk(\@genes_in_region_request);
     # print STDERR Dumper(GIR_ANSWER => \@genes_in_region_response);
     my $all_families = {};
-    
+
     if (0)
     {
         # mysql families
@@ -2081,7 +2229,7 @@ sub compare_regions_for_peg
     else
     {
         # p3 families
-	
+
         for my $gir (@genes_in_region_response)
         {
             my($reg) = @$gir;
@@ -2098,15 +2246,15 @@ sub compare_regions_for_peg
             }
         }
     }
-    
+
     for my $pin_row (0..$#pin)
     {
         my $elt = $pin[$pin_row];
-	
-	#	my ($left, $right);
-	#	($left, $right) = $elt->{strand} eq '+' ? ($elt->{start}, $elt->{end}) : ($elt->{end}, $elt->{start});
-	#	my $mid = int(($left + $right) / 2);
-	
+
+    #	my ($left, $right);
+    #	($left, $right) = $elt->{strand} eq '+' ? ($elt->{start}, $elt->{end}) : ($elt->{end}, $elt->{start});
+    #	my $mid = int(($left + $right) / 2);
+
         my($ref_b,$ref_e, $ref_sz);
         if ($elt->{strand} eq '+')
         {
@@ -2121,15 +2269,15 @@ sub compare_regions_for_peg
             $ref_sz = $ref_b - $ref_e;
         }
         my $mid = $ref_e;
-	
+
         # my($reg, $leftmost, $rightmost) = $self->genes_in_region($elt->{genome_id}, $elt->{accession}, $mid - $half_width, $mid + $half_width);
         my($reg, $leftmost, $rightmost) = @{$genes_in_region_response[$pin_row]};
         my $features = [];
-	
-	#	my $region_mid = int(($leftmost + $rightmost) / 2) ;
-	
+
+    #	my $region_mid = int(($leftmost + $rightmost) / 2) ;
+
         print STDERR "Shift: $elt->{patric_id} $elt->{blast_shift}\n";
-	
+
         my $bfeature = {
             fid => "$elt->{patric_id}.BLAST",
             type => "blast",
@@ -2145,20 +2293,20 @@ sub compare_regions_for_peg
             function => "blast hit for pin",
             attributes => [ [ "BLAST identity" => $elt->{match_iden} ] ],
         };
-	
-	
+
+
         for my $fent (@$reg)
         {
             my $size = $fent->{right} - $fent->{left} + 1;
             my $offset = $fent->{mid} - $mid;
             my $offset_beg = $fent->{start} - $mid;
             my $offset_end = $fent->{end} - $mid;
-	    
+
             my $mapped_type = $typemap{$fent->{feature_type}} // $fent->{feature_type};
-	    
+
             my $fid = $fent->{patric_id};
-	    
-	    
+
+
             my $attrs = [];
             for my $fname (sort keys %{$all_families->{$fid}})
             {
@@ -2180,9 +2328,9 @@ sub compare_regions_for_peg
                 }
                 push(@$attrs, [$fname, $funstr]);
             }
-	    
+
             my $coloring_val = $all_families->{$fid}->{$coloring_method}->[0];
-	    
+
             my $feature = {
                 fid => $fid,
                 type => $mapped_type,
@@ -2199,24 +2347,24 @@ sub compare_regions_for_peg
                 location   => $elt->{accession}."_".$fent->{start}."_".$fent->{end},
                 attributes => $attrs,
             };
-	    
-	    
+
+
             if ($fid eq $elt->{patric_id})
             {
                 #
                 # this is the pinned peg. Do any special processing here.
                 #
-		
+
                 $set_1_fam = $coloring_val if $pin_row == 0;
                 #$set_1_fam = $fent->{$coloring_field} if $pin_row == 0;
                 $feature->{blast_identity} = $elt->{match_iden};
             }
-	    
+
             push(@$features, $feature);
             push(@all_features, [$fent, $feature, $pin_row, abs($fent->{mid} - $mid)]);
         }
         push(@$features, $bfeature);
-	
+
         my $out_ent = {
             # beg => $leftmost,
             # end => $rightmost,
@@ -2232,7 +2380,7 @@ sub compare_regions_for_peg
         };
         push(@out, $out_ent);
     }
-    
+
     #
     # Postprocess to assign color sets.
     #
@@ -2240,10 +2388,10 @@ sub compare_regions_for_peg
     #
     my $next_set = 1;
     my %set;
-    
+
     $set{$set_1_fam} = $next_set++ if $set_1_fam;
     print STDERR "Set1 fam = $set_1_fam\n";
-    
+
     my @sorted_all  = sort { $a->[2] <=> $b->[2] or $a->[3] <=> $b->[3] } @all_features;
     print STDERR join("\t", @{$_->[1]}{qw(fid beg end strand offset)}, $_->[3], $_->[2], @{$_->[0]}{qw(pgfam_id)}), "\n" foreach @sorted_all;
     for my $ent (@sorted_all)
@@ -2260,7 +2408,7 @@ sub compare_regions_for_peg
             $ent->[1]->{set_number} = $set;
         }
     }
-    
+
     return \@out;
 }
 
@@ -2599,41 +2747,41 @@ sub genes_in_region_bulk
         # We need to query with some slop because the solr schema currently does
         # not have left/right coordinates, rather start/end.
         #
-	# If we are doing a tight query, we can restrict the feature start and end to both
-	# be strictly in the region. We include a bit of slop here.
-	#
+    # If we are doing a tight query, we can restrict the feature start and end to both
+    # be strictly in the region. We include a bit of slop here.
+    #
 
-	my @fq = (
-		  "sequence_id:$contig OR accession:$contig",
-		  "annotation:PATRIC",
-		  "NOT feature_type:source");
+    my @fq = (
+          "sequence_id:$contig OR accession:$contig",
+          "annotation:PATRIC",
+          "NOT feature_type:source");
 
-	if ($tight)
-	{
-	    my $begx = $beg - 15;
-	    $begx = 1 if $begx < 1;
-	    my $endx = $end + 15;
-	    push(@fq,
-		 "start:[$begx TO $endx] AND end:[$begx TO $endx]",
-		);
-	}	    
-	else
-	{
-	    my $slop = 5000;
-	    my $begx = ($beg > $slop + 1) ? $beg - $slop : 1;
-	    my $endx = $end + $slop;
-	    
-	    $begx = 1 if $begx < 1;
+    if ($tight)
+    {
+        my $begx = $beg - 15;
+        $begx = 1 if $begx < 1;
+        my $endx = $end + 15;
+        push(@fq,
+         "start:[$begx TO $endx] AND end:[$begx TO $endx]",
+        );
+    }
+    else
+    {
+        my $slop = 5000;
+        my $begx = ($beg > $slop + 1) ? $beg - $slop : 1;
+        my $endx = $end + $slop;
 
-	    push(@fq, "start:[$begx TO $endx] OR end:[$begx TO $endx]");
-	}
+        $begx = 1 if $begx < 1;
 
-	push(@queries, ["genome_feature",
-			[
-			 [q => "genome_id:$genome"],
-			 (map { [fq => $_] } @fq ),
-			 [fl => 'start,end,feature_id,product,figfam_id,strand,patric_id,pgfam_id,plfam_id,aa_sequence_md5,genome_name,feature_type'],
-			 ]]);
+        push(@fq, "start:[$begx TO $endx] OR end:[$begx TO $endx]");
+    }
+
+    push(@queries, ["genome_feature",
+            [
+             [q => "genome_id:$genome"],
+             (map { [fq => $_] } @fq ),
+             [fl => 'start,end,feature_id,product,figfam_id,strand,patric_id,pgfam_id,plfam_id,aa_sequence_md5,genome_name,feature_type'],
+             ]]);
     }
 
     # print Dumper(Q => @queries);
@@ -3003,7 +3151,7 @@ sub annotate_pin_with_blast
             my $ent = shift;
             $seqs->{$ent->{md5}} = $ent->{sequence};
         });
-	# print STDERR Dumper(seqdata => $seqs, \%md5_to_id);
+    # print STDERR Dumper(seqdata => $seqs, \%md5_to_id);
 
         my $me_md5 = $me->{aa_sequence_md5};
         my $me_seq = $seqs->{$me->{aa_sequence_md5}};
@@ -3039,7 +3187,7 @@ sub annotate_pin_with_blast
         # clever moving forward.
         #
         my @hits;
-	my %found = map { $_->{patric_id} => 1 } @pin;
+    my %found = map { $_->{patric_id} => 1 } @pin;
         while (<$blast>)
         {
             chomp;
@@ -3052,12 +3200,12 @@ sub annotate_pin_with_blast
             push(@hits, [$me->{patric_id}, $_, $iden, $b1, $e1, $b2, $e2])
                 foreach @{$md5_to_id{$id2}};
         }
-	
+
         for my $hit (@hits)
         {
             my($id1, $id2, $iden, $b1, $e1, $b2, $e2) = @$hit;
             next if $seen{$id1, $id2}++;
-	    delete $found{$id2};
+        delete $found{$id2};
 
             if ($id2 eq $fid)
             {
@@ -3080,25 +3228,25 @@ sub annotate_pin_with_blast
         }
         close ($blast);
 
-	#
-	# Patch in the non-matching ids in the pin.
-	#
-	for my $id (keys %found)
-	{
+    #
+    # Patch in the non-matching ids in the pin.
+    #
+    for my $id (keys %found)
+    {
             my $shift = 0;
             my $match = $cut_pin{$id};
             $match->{blast_shift} = 0;
-	    my $prot_len = abs(int(($match->{end} - $match->{start}) / 3));
-	    my $me_prot_len = abs(int(($me->{end} - $me->{start}) / 3));
+        my $prot_len = abs(int(($match->{end} - $match->{start}) / 3));
+        my $me_prot_len = abs(int(($me->{end} - $me->{start}) / 3));
 
-	    my $len = $prot_len < $me_prot_len ? $prot_len : $me_prot_len;
-	    my $center = int($prot_len / 2);
-	    my $l2 = int($len / 2);
+        my $len = $prot_len < $me_prot_len ? $prot_len : $me_prot_len;
+        my $center = int($prot_len / 2);
+        my $l2 = int($len / 2);
             $match->{match_beg} = $center - $l2;
             $match->{match_end} = $center + $l2;
             $match->{match_iden} = 0;
             push(@out, $match);
-	}
+    }
     $#out = $max_size - 1 if $max_size && @out > $max_size - 1;
     }
     else
@@ -3727,6 +3875,7 @@ sub gto_of {
                           "alt_locus_tag", "refseq_locus_tag",
                           "protein_id",    "gene_id",
                           "gi",            "gene",
+                          "uniprotkb_accession",
                           "go", "genome_id",
                           "pgfam_id", "plfam_id"
                           ]
@@ -3757,10 +3906,12 @@ sub gto_of {
                  ];
             }
             my @aliases;
-            push( @aliases, "gi|$f->{gi}" )          if $f->{gi};
-            push( @aliases, $f->{gene} )             if $f->{gene};
-            push( @aliases, "GeneID:$f->{gene_id}" ) if $f->{gene_id};
-            push( @aliases, $f->{refseq_locus_tag} ) if $f->{refseq_locus_tag};
+            push( @aliases, ["gi", $f->{gi}] )          			if $f->{gi};
+            push( @aliases, ["gene_name", $f->{gene}] )             if $f->{gene};
+            push( @aliases, ["GeneID", $f->{gene_id}] ) 			if $f->{gene_id};
+            push( @aliases, ["protein_id", $f->{protein_id}] )		if $f->{protein_id};
+            push( @aliases, ["UniProt", $f->{uniprotkb_accession}])	if $f->{uniprotkb_accession};
+            push( @aliases, ["LocusTag", $f->{refseq_locus_tag}] )	if $f->{refseq_locus_tag};
             my @familyList;
             if ($f->{pgfam_id}) {
                 push @familyList, ['PGFAM', $f->{pgfam_id}];
@@ -3785,7 +3936,7 @@ sub gto_of {
                                  -type                => $f->{feature_type},
                                  -function            => $f->{product},
                                  -protein_translation => $sequences->{$f->{aa_sequence_md5}},
-                                 -aliases             => \@aliases,
+                                 -alias_pairs         => \@aliases,
                                  -go_terms			  => \@goTerms,
                                  -family_assignments => \@familyList
                                  }
